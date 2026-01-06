@@ -8,7 +8,7 @@ const BudgetContext = createContext();
 export const useBudget = () => useContext(BudgetContext);
 
 export const BudgetProvider = ({ children }) => {
-    const API_URL = 'http://localhost:3000/api';
+    const API_URL = '/api';
 
     const [transactions, setTransactions] = useState([]);
     const [recurring, setRecurring] = useState([]);

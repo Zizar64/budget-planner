@@ -70,12 +70,11 @@ const init = () => {
         )
     `).run();
 
-    // Seed default admin if not exists
+    // Seed default user if not exists
     const userCount = db.prepare('SELECT count(*) as count FROM users').get();
     if (userCount.count === 0) {
-        const hash = '$2b$10$NICbGfYnAQDLg82gr4JaVOKRrUJWqiir5Tb4iliz0W0w.4D7aGAWm'; // admin123
-        db.prepare('INSERT INTO users (id, username, password) VALUES (?, ?, ?)').run(uuidv4(), 'admin', hash);
-        console.log('Default admin user created');
+        // DB is already seeded via external script or initial setup
+        console.log('No users found. Please run setup script.');
     }
 
 

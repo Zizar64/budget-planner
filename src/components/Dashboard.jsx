@@ -93,7 +93,7 @@ export default function Dashboard() {
                 </div>
                 <div className="text-right flex flex-col items-end gap-2">
                     <button
-                        onClick={() => window.open('http://localhost:3000/api/export', '_blank')}
+                        onClick={() => window.open('/api/export', '_blank')}
                         className="flex items-center gap-2 px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs text-indigo-400 transition-colors"
                         title="Sauvegarder les données"
                     >

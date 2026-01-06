@@ -1,16 +1,57 @@
-# React + Vite
+# Budget Planner
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A personal finance management application built with React, Vite, Express, and Better-SQLite3.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Dashboard**: Visual overview of your finances with projections.
+- **Transactions**: Track expenses and income.
+- **Recurring Items**: Manage subscriptions and regular bills.
+- **Savings Goals**: Set and track savings targets.
+- **Secure**: User authentication with bcrypt password hashing.
 
-## React Compiler
+## Deployment on Proxmox (LXC)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Prerequisites
 
-## Expanding the ESLint configuration
+- Debian 12 LXC Container
+- Node.js 22+
+- Git
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Initial Setup
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/Zizar64/budget-planner /opt/budget-planner
+   cd /opt/budget-planner
+   ```
+
+2. Run the setup script:
+
+   ```bash
+   chmod +x scripts/setup.sh
+   ./scripts/setup.sh
+   ```
+
+### Updating the Application
+
+To update to the latest version, run the update script locally on the server:
+
+```bash
+cd /opt/budget-planner
+chmod +x scripts/update.sh
+./scripts/update.sh
+```
+
+## Local Development
+
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Start dev server: `npm run dev` (Runs backend on port 3000 and frontend on 5173 with proxy)
+
+## Security
+
+- Default admin user is removed.
+- Initial user creation is handled during setup.
+- Passwords are hashed using bcrypt.
