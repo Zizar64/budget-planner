@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #030712;
+  --bg-secondary: #0f172a;
+  /* Slate 900 */
+  --bg-card: rgba(30, 41, 59, 0.7);
+  /* Slate 800 with opacity */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --accent-primary: #6366f1;
+  /* Indigo 500 */
+  --accent-secondary: #10b981;
+  /* Emerald 500 */
+  --accent-danger: #f43f5e;
+  /* Rose 500 */
+  --accent-warning: #f59e0b;
+  /* Amber 500 */
+  --border-color: rgba(148, 163, 184, 0.1);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+  --radius: 12px;
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Utilities */
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+
+.title-gradient {
+  background: linear-gradient(to right, var(--text-primary), var(--text-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.grid-layout {
+  display: grid;
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
