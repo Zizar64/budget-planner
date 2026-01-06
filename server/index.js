@@ -1,22 +1,77 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import db from './db.js';
 import { v4 as uuidv4 } from 'uuid';
 
+import cookieParser from 'cookie-parser';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 const port = 3000;
+const JWT_SECRET = 'your-secret-key-change-it-in-prod'; // TODO: Move to env var
 
-app.use(cors());
+app.use(cors({
+    origin: 'http://localhost:5173', // Vite dev server
+    credentials: true
+}));
 app.use(express.json());
+app.use(cookieParser());
+
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, '../dist')));
+
+// --- AUTH MIDDLEWARE ---
+const authenticateToken = (req, res, next) => {
+    const token = req.cookies.token;
+    if (!token) return res.sendStatus(401);
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) return res.sendStatus(403);
+        req.user = user;
+        next();
+    });
+};
+
+
+// --- AUTH ---
+app.post('/api/auth/login', (req, res) => {
+    const { username, password } = req.body;
+    const stmt = db.prepare('SELECT * FROM users WHERE username = ?');
+    const user = stmt.get(username);
+
+    if (!user || !bcrypt.compareSync(password, user.password)) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '24h' });
+    res.cookie('token', token, { httpOnly: true, secure: false }); // secure: true in prod (requires https)
+    res.json({ id: user.id, username: user.username });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+    res.clearCookie('token');
+    res.json({ success: true });
+});
+
+app.get('/api/auth/me', authenticateToken, (req, res) => {
+    res.json(req.user);
+});
+
 
 // --- SETTINGS ---
-app.get('/api/settings/:key', (req, res) => {
+app.get('/api/settings/:key', authenticateToken, (req, res) => {
     const stmt = db.prepare('SELECT value FROM settings WHERE key = ?');
     const row = stmt.get(req.params.key);
     res.json(row ? JSON.parse(row.value) : null);
 });
 
-app.post('/api/settings', (req, res) => {
+app.post('/api/settings', authenticateToken, (req, res) => {
     const { key, value } = req.body;
     const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
     stmt.run(key, JSON.stringify(value));
@@ -24,7 +79,7 @@ app.post('/api/settings', (req, res) => {
 });
 
 // --- TRANSACTIONS ---
-app.get('/api/transactions', (req, res) => {
+app.get('/api/transactions', authenticateToken, (req, res) => {
     const stmt = db.prepare('SELECT * FROM transactions');
     const rows = stmt.all();
     const mapped = rows.map(r => ({
@@ -34,7 +89,7 @@ app.get('/api/transactions', (req, res) => {
     res.json(mapped);
 });
 
-app.post('/api/transactions', (req, res) => {
+app.post('/api/transactions', authenticateToken, (req, res) => {
     const { label, amount, date, type, category, status, recurringId } = req.body;
 
     const txn = {
@@ -62,7 +117,7 @@ app.post('/api/transactions', (req, res) => {
     }
 });
 
-app.put('/api/transactions/:id', (req, res) => {
+app.put('/api/transactions/:id', authenticateToken, (req, res) => {
     const { id } = req.params;
     const { label, amount, date, type, category, status, recurringId } = req.body;
 
@@ -88,14 +143,14 @@ app.put('/api/transactions/:id', (req, res) => {
     }
 });
 
-app.delete('/api/transactions/:id', (req, res) => {
+app.delete('/api/transactions/:id', authenticateToken, (req, res) => {
     const stmt = db.prepare('DELETE FROM transactions WHERE id = ?');
     stmt.run(req.params.id);
     res.json({ success: true });
 });
 
 // --- RECURRING ---
-app.get('/api/recurring', (req, res) => {
+app.get('/api/recurring', authenticateToken, (req, res) => {
     const stmt = db.prepare('SELECT * FROM recurring_items');
     const rows = stmt.all();
     const mapped = rows.map(r => ({
@@ -108,7 +163,7 @@ app.get('/api/recurring', (req, res) => {
     res.json(mapped);
 });
 
-app.post('/api/recurring', (req, res) => {
+app.post('/api/recurring', authenticateToken, (req, res) => {
     const { label, amount, type, category, dayOfMonth, startDate, endDate, durationMonths } = req.body;
 
     const item = {
@@ -143,7 +198,7 @@ app.post('/api/recurring', (req, res) => {
     }
 });
 
-app.put('/api/recurring/:id', (req, res) => {
+app.put('/api/recurring/:id', authenticateToken, (req, res) => {
     const { id } = req.params;
     const body = req.body;
 
@@ -170,20 +225,20 @@ app.put('/api/recurring/:id', (req, res) => {
     }
 });
 
-app.delete('/api/recurring/:id', (req, res) => {
+app.delete('/api/recurring/:id', authenticateToken, (req, res) => {
     const stmt = db.prepare('DELETE FROM recurring_items WHERE id = ?');
     stmt.run(req.params.id);
     res.json({ success: true });
 });
 
 // --- PLANNED ITEMS ---
-app.get('/api/planned', (req, res) => {
+app.get('/api/planned', authenticateToken, (req, res) => {
     const stmt = db.prepare('SELECT * FROM planned_items');
     const rows = stmt.all();
     res.json(rows);
 });
 
-app.post('/api/planned', (req, res) => {
+app.post('/api/planned', authenticateToken, (req, res) => {
     const { label, amount, date, type, category, status } = req.body;
     const item = {
         id: uuidv4(),
@@ -209,14 +264,14 @@ app.post('/api/planned', (req, res) => {
 });
 
 // --- SAVINGS ---
-app.get('/api/savings', (req, res) => {
+app.get('/api/savings', authenticateToken, (req, res) => {
     const stmt = db.prepare('SELECT * FROM savings_goals');
     const rows = stmt.all();
     res.json(rows);
 });
 
 // --- EXPORT/BACKUP ---
-app.get('/api/export', (req, res) => {
+app.get('/api/export', authenticateToken, (req, res) => {
     try {
         const transactions = db.prepare('SELECT * FROM transactions').all();
         const recurring = db.prepare('SELECT * FROM recurring_items').all();
@@ -249,4 +304,10 @@ app.get('/api/export', (req, res) => {
 
 app.listen(port, () => {
     console.log(`Backend server running at http://localhost:${port}`);
+});
+
+// The "catchall" handler: for any request that doesn't
+// match one above, send back React's index.html file.
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../dist/index.html'));
 });

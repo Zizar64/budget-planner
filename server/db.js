@@ -1,11 +1,12 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { v4 as uuidv4 } from 'uuid';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dbPath = path.join(__dirname, 'budget.db');
+const dbPath = process.env.DB_PATH || path.join(__dirname, 'budget.db');
 const db = new Database(dbPath);
 
 // Initialize Tables
@@ -59,6 +60,24 @@ const init = () => {
             color TEXT
         )
     `).run();
+
+    // Users Table
+    db.prepare(`
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
+        )
+    `).run();
+
+    // Seed default admin if not exists
+    const userCount = db.prepare('SELECT count(*) as count FROM users').get();
+    if (userCount.count === 0) {
+        const hash = '$2b$10$NICbGfYnAQDLg82gr4JaVOKRrUJWqiir5Tb4iliz0W0w.4D7aGAWm'; // admin123
+        db.prepare('INSERT INTO users (id, username, password) VALUES (?, ?, ?)').run(uuidv4(), 'admin', hash);
+        console.log('Default admin user created');
+    }
+
 
     // Planned Exceptions (One-off planned items)
     db.prepare(`
