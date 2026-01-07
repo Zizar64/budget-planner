@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Link, useLocation, Navigate, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Wallet, CreditCard, PiggyBank, Calendar, LogOut } from 'lucide-react';
+import { LayoutDashboard, Wallet, CreditCard, PiggyBank, Calendar, LogOut, Settings as SettingsIcon } from 'lucide-react';
 import { BudgetProvider } from './context/BudgetContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Dashboard from './components/Dashboard';
@@ -10,6 +10,7 @@ import TransactionManager from './components/Transactions/TransactionManager';
 import BudgetPlanner from './components/Budget/BudgetPlanner';
 import SavingsPlanner from './components/Savings/SavingsPlanner';
 import MonthlyActivity from './components/Activity/MonthlyActivity';
+import Settings from './components/Settings/Settings';
 
 const NavItem = ({ to, icon: Icon, label }) => {
   const location = useLocation();
@@ -50,6 +51,7 @@ const ProtectedLayout = () => {
           <NavItem to="/transactions" icon={CreditCard} label="Transactions" />
           <NavItem to="/budget" icon={Wallet} label="Budget" />
           <NavItem to="/savings" icon={PiggyBank} label="Épargne" />
+          <NavItem to="/settings" icon={SettingsIcon} label="Paramètres" />
         </div>
 
         <div className="pt-6 border-t border-[var(--border-color)]">
@@ -87,6 +89,7 @@ function App() {
             <Route path="/transactions" element={<TransactionManager />} />
             <Route path="/budget" element={<BudgetPlanner />} />
             <Route path="/savings" element={<SavingsPlanner />} />
+            <Route path="/settings" element={<Settings />} />
           </Route>
         </Routes>
       </BudgetProvider>

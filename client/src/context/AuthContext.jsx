@@ -26,20 +26,36 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const login = async (username, password) => {
-        const res = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password }),
-            credentials: 'include' // Important for cookies
-        });
+        try {
+            console.log("Attempting login for:", username);
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password }),
+                credentials: 'include' // Important for cookies
+            });
 
-        if (res.ok) {
-            const data = await res.json();
-            setUser(data);
-            return { success: true };
-        } else {
-            const err = await res.json();
-            return { success: false, error: err.error };
+            console.log("Login response status:", res.status);
+
+            if (res.ok) {
+                const data = await res.json();
+                setUser(data);
+                return { success: true };
+            } else {
+                let errorMsg = 'Login failed';
+                try {
+                    const err = await res.json();
+                    errorMsg = err.error || errorMsg;
+                } catch (e) {
+                    console.error("Error parsing error response:", e);
+                    const text = await res.text();
+                    console.error("Raw response:", text);
+                }
+                return { success: false, error: errorMsg };
+            }
+        } catch (err) {
+            console.error("Login network error:", err);
+            return { success: false, error: "Network error: " + err.message };
         }
     };
 

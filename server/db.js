@@ -1,99 +1,115 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import pg from 'pg';
 import { v4 as uuidv4 } from 'uuid';
+import bcrypt from 'bcryptjs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const { Pool } = pg;
 
-const dbPath = process.env.DB_PATH || path.join(__dirname, 'budget.db');
-const db = new Database(dbPath);
+const pool = new Pool({
+    user: process.env.POSTGRES_USER || 'postgres',
+    host: process.env.POSTGRES_HOST || 'db',
+    database: process.env.POSTGRES_DB || 'budget_planner',
+    password: process.env.POSTGRES_PASSWORD || 'password',
+    port: 5432,
+});
 
 // Initialize Tables
-const init = () => {
-    // Settings Table (for initial balance, etc.)
-    db.prepare(`
-        CREATE TABLE IF NOT EXISTS settings (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        )
-    `).run();
+const init = async () => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
 
-    // Transactions Table
-    db.prepare(`
-        CREATE TABLE IF NOT EXISTS transactions (
-            id TEXT PRIMARY KEY,
-            label TEXT NOT NULL,
-            amount REAL NOT NULL,
-            date TEXT NOT NULL, 
-            type TEXT NOT NULL,
-            category TEXT,
-            status TEXT DEFAULT 'confirmed',
-            recurring_id TEXT
-        )
-    `).run();
+        // Settings Table
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        `);
 
-    // Recurring Items Table
-    db.prepare(`
-        CREATE TABLE IF NOT EXISTS recurring_items (
-            id TEXT PRIMARY KEY,
-            label TEXT NOT NULL,
-            amount REAL NOT NULL,
-            type TEXT NOT NULL,
-            category TEXT,
-            day_of_month INTEGER NOT NULL,
-            start_date TEXT,
-            end_date TEXT,
-            duration_months INTEGER
-        )
-    `).run();
+        // Transactions Table
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS transactions (
+                id TEXT PRIMARY KEY,
+                label TEXT NOT NULL,
+                amount REAL NOT NULL,
+                date TEXT NOT NULL, 
+                type TEXT NOT NULL,
+                category TEXT,
+                status TEXT DEFAULT 'confirmed',
+                recurring_id TEXT
+            )
+        `);
 
-    // Savings Goals Table
-    db.prepare(`
-        CREATE TABLE IF NOT EXISTS savings_goals (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            target_amount REAL NOT NULL,
-            current_amount REAL DEFAULT 0,
-            deadline TEXT,
-            icon TEXT,
-            color TEXT
-        )
-    `).run();
+        // Recurring Items Table
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS recurring_items (
+                id TEXT PRIMARY KEY,
+                label TEXT NOT NULL,
+                amount REAL NOT NULL,
+                type TEXT NOT NULL,
+                category TEXT,
+                day_of_month INTEGER NOT NULL,
+                start_date TEXT,
+                end_date TEXT,
+                duration_months INTEGER
+            )
+        `);
 
-    // Users Table
-    db.prepare(`
-        CREATE TABLE IF NOT EXISTS users (
-            id TEXT PRIMARY KEY,
-            username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL
-        )
-    `).run();
+        // Savings Goals Table
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS savings_goals (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                target_amount REAL NOT NULL,
+                current_amount REAL DEFAULT 0,
+                deadline TEXT,
+                icon TEXT,
+                color TEXT
+            )
+        `);
 
-    // Seed default user if not exists
-    const userCount = db.prepare('SELECT count(*) as count FROM users').get();
-    if (userCount.count === 0) {
-        // DB is already seeded via external script or initial setup
-        console.log('No users found. Please run setup script.');
+        // Users Table
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL
+            )
+        `);
+
+        // Seed default user if not exists
+        const userCountRes = await client.query('SELECT count(*) FROM users');
+        if (parseInt(userCountRes.rows[0].count) === 0) {
+            const hashedPassword = bcrypt.hashSync('admin', 10);
+            await client.query('INSERT INTO users (id, username, password) VALUES ($1, $2, $3)', [uuidv4(), 'admin', hashedPassword]);
+            console.log('Default admin user created: admin/admin');
+        }
+
+        // Planned Exceptions
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS planned_items (
+                id TEXT PRIMARY KEY,
+                label TEXT NOT NULL,
+                amount REAL NOT NULL,
+                date TEXT NOT NULL,
+                type TEXT NOT NULL,
+                category TEXT,
+                status TEXT DEFAULT 'planned'
+            )
+        `);
+
+        await client.query('COMMIT');
+        console.log('Database initialized');
+    } catch (e) {
+        await client.query('ROLLBACK');
+        console.error('Error upgrading db', e);
+    } finally {
+        client.release();
     }
-
-
-    // Planned Exceptions (One-off planned items)
-    db.prepare(`
-        CREATE TABLE IF NOT EXISTS planned_items (
-            id TEXT PRIMARY KEY,
-            label TEXT NOT NULL,
-            amount REAL NOT NULL,
-            date TEXT NOT NULL,
-            type TEXT NOT NULL,
-            category TEXT,
-            status TEXT DEFAULT 'planned'
-        )
-    `).run();
-
-    console.log('Database initialized');
 };
 
+// We don't await init() at top level to avoid blocking import, but main server should wait or retry.
+// For simplicity in this stack, we call it.
 init();
 
-export default db;
+export default pool;

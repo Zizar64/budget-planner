@@ -1,57 +1,64 @@
 # Budget Planner
 
-A personal finance management application built with React, Vite, Express, and Better-SQLite3.
+A personal finance application to track expenses, recurring items, and project future balances.
 
-## Features
+## 🏗 Architecture
 
-- **Dashboard**: Visual overview of your finances with projections.
-- **Transactions**: Track expenses and income.
-- **Recurring Items**: Manage subscriptions and regular bills.
-- **Savings Goals**: Set and track savings targets.
-- **Secure**: User authentication with bcrypt password hashing.
+This project has been refactored into a **containerized** application using Docker.
 
-## Deployment on Proxmox (LXC)
+*   **Client**: React 19 + Vite (Port 8080)
+*   **Server**: Node.js + Express (Port 3000)
+*   **Database**: PostgreSQL 15 (Port 5432)
+
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- Debian 12 LXC Container
-- Node.js 22+
-- Git
+*   **Docker Desktop** (or Docker Engine + Compose)
+*   *Make sure ports 8080, 3000, and 5432 are free.*
 
-### Initial Setup
+### Installation & Run
 
-1. Clone the repository:
+1.  Clone the repository:
+    ```bash
+    git clone <repository-url>
+    cd Budget_planner
+    ```
 
-   ```bash
-   git clone https://github.com/Zizar64/budget-planner /opt/budget-planner
-   cd /opt/budget-planner
-   ```
+2.  Start the application:
+    ```bash
+    docker compose up --build -d
+    ```
 
-2. Run the setup script:
+3.  Access the app:
+    *   Frontend: [http://localhost:8080](http://localhost:8080)
+    *   Backend API: [http://localhost:3000](http://localhost:3000)
 
-   ```bash
-   chmod +x scripts/setup.sh
-   ./scripts/setup.sh
-   ```
+### Default Login
 
-### Updating the Application
+When the database is initialized for the first time, a default admin user is created:
 
-To update to the latest version, run the update script locally on the server:
+*   **Username**: `admin`
+*   **Password**: `admin`
 
-```bash
-cd /opt/budget-planner
-chmod +x scripts/update.sh
-./scripts/update.sh
-```
+*(You can change the password in the "Paramètres" section after logging in).*
 
-## Local Development
+## 🛠 Tech Stack
 
-1. Clone the repository
-2. Install dependencies: `npm install`
-3. Start dev server: `npm run dev` (Runs backend on port 3000 and frontend on 5173 with proxy)
+*   **Frontend**: React, TailwindCSS, Lucide Icons, Recharts, Date-fns.
+*   **Backend**: Express, pg (node-postgres), Bcrypt, JWT.
+*   **DevOps**: Docker, Docker Compose, Nginx (Client serving).
 
-## Security
+## 📂 Project Structure
 
-- Default admin user is removed.
-- Initial user creation is handled during setup.
-- Passwords are hashed using bcrypt.
+*   `client/`: Frontend source code.
+*   `server/`: Backend source code and database logic.
+*   `docker-compose.yml`: Service orchestration.
+*   `_legacy_backup/`: Old files (SQLite DB, etc.) from previous versions.
+
+## 📝 development
+
+To work on the project locally without Docker (optional):
+
+1.  **Server**: `cd server && npm install && npm run dev` (Requires a running Postgres DB)
+2.  **Client**: `cd client && npm install && npm run dev`

@@ -34,7 +34,7 @@ export const BudgetProvider = ({ children }) => {
                 const saves = await saveRes.json();
                 const bal = await balRes.json();
 
-                setTransactions(txns || []);
+                setTransactions(txns ? txns.map(t => ({ ...t, recurringId: t.recurring_id || t.recurringId })) : []);
                 setRecurring(recs || []);
                 setPlanned(plans || []);
                 setSavingsGoals(saves || []);
@@ -77,7 +77,7 @@ export const BudgetProvider = ({ children }) => {
             body: JSON.stringify(newTxn)
         });
         const savedTxn = await res.json();
-        setTransactions(prev => [...prev, savedTxn]);
+        setTransactions(prev => [...prev, { ...savedTxn, recurringId: savedTxn.recurring_id || savedTxn.recurringId }]);
     };
 
     const updateTransaction = async (id, updatedFields) => {
@@ -166,7 +166,19 @@ export const BudgetProvider = ({ children }) => {
                     }
                 }
 
-                const itemDate = new Date(iterDate.getFullYear(), iterDate.getMonth(), rec.dayOfMonth);
+                // Handle end of month overflow (e.g. 31st in Feb)
+                const monthStart = startOfMonth(iterDate);
+                const monthEnd = endOfMonth(monthStart);
+                const safeDay = Math.min(rec.dayOfMonth, parseInt(format(monthEnd, 'd')));
+                const itemDate = new Date(iterDate.getFullYear(), iterDate.getMonth(), safeDay);
+
+                // Deduplicate: Check if a transaction (confirmed or planned) already exists for this recurring item this month
+                const hasMatch = transactions.some(t =>
+                    t.recurringId === rec.id &&
+                    t.date &&
+                    isSameMonth(parseISO(t.date), itemDate)
+                );
+                if (hasMatch) return;
                 if (isAfter(itemDate, startDate) && isBefore(itemDate, endDate)) {
                     events.push({
                         ...rec,
