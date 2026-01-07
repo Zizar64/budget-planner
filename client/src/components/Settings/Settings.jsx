@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, Save, AlertCircle, Check } from 'lucide-react';
+import CategoriesManager from './CategoriesManager';
 
 export default function Settings() {
     const [oldPassword, setOldPassword] = useState('');
@@ -119,6 +120,74 @@ export default function Settings() {
                         )}
                     </button>
                 </form>
+            </div>
+
+            <CategoriesManager />
+
+            {/* Backup & Restore Section */}
+            <div className="glass-panel p-8 max-w-xl">
+                <div className="flex items-center gap-3 mb-6 text-indigo-400">
+                    <Save size={24} />
+                    <h2 className="text-xl font-semibold">Sauvegarde & Restauration</h2>
+                </div>
+
+                <p className="text-gray-400 mb-6 text-sm">
+                    Téléchargez une copie sécurisée de vos données ou restaurez une sauvegarde existante.
+                    Les fichiers sont chiffrés et ne peuvent être lus que par cette application.
+                </p>
+
+                <div className="flex flex-col gap-4">
+                    <button
+                        onClick={() => window.open('/api/backup', '_blank')}
+                        className="btn-primary flex items-center justify-center gap-2 w-full"
+                    >
+                        <Save size={18} />
+                        Télécharger une sauvegarde (.budget)
+                    </button>
+
+                    <div className="relative">
+                        <input
+                            type="file"
+                            accept=".budget"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            onChange={async (e) => {
+                                const file = e.target.files[0];
+                                if (!file) return;
+
+                                if (!confirm("ATTENTION : Cette action écrasera toutes les données actuelles par celles de la sauvegarde. Voulez-vous continuer ?")) {
+                                    e.target.value = '';
+                                    return;
+                                }
+
+                                const reader = new FileReader();
+                                reader.onload = async (event) => {
+                                    const base64Data = event.target.result;
+                                    try {
+                                        const res = await fetch('/api/restore', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ data: base64Data })
+                                        });
+                                        const result = await res.json();
+                                        if (result.success) {
+                                            alert("Restauration réussie ! La page va se recharger.");
+                                            window.location.reload();
+                                        } else {
+                                            alert("Erreur de restauration: " + result.error);
+                                        }
+                                    } catch (err) {
+                                        alert("Erreur réseau: " + err.message);
+                                    }
+                                };
+                                reader.readAsDataURL(file);
+                            }}
+                        />
+                        <button className="w-full bg-slate-800 hover:bg-slate-700 text-indigo-400 border border-indigo-500/30 py-3 rounded font-medium flex items-center justify-center gap-2 transition-colors">
+                            <Check size={18} />
+                            Restaurer depuis un fichier
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );

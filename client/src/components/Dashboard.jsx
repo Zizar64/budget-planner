@@ -1,12 +1,13 @@
 import React, { useMemo } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { TrendingDown, TrendingUp, Wallet, Calendar, Edit2, Check, Download } from 'lucide-react';
+import { TrendingDown, TrendingUp, Wallet, Calendar, Edit2, Check, Download, PieChart as PieChartIcon } from 'lucide-react';
 import { format, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import SpendingChart from './Dashboard/SpendingChart';
 
 export default function Dashboard() {
-    const { balance, getProjection, getEventsForPeriod, initialBalance, setInitialBalance } = useBudget();
+    const { balance, getProjection, getEventsForPeriod, initialBalance, setInitialBalance, getMonthlyReport } = useBudget();
 
     const [isEditingBalance, setIsEditingBalance] = React.useState(false);
     const [editBalanceValue, setEditBalanceValue] = React.useState('');
@@ -34,11 +35,10 @@ export default function Dashboard() {
     // Get projection based on selected timeframe
     const data = useMemo(() => getProjection(projectionMonths), [getProjection, projectionMonths]);
 
-    // Calculate Gradient Offset for split coloring
-    // ... existing gradient logic (omitted for brevity in replacement if unchanged, but need to include context)
-    // Actually simpler to just replace the whole component block related to chart or just the lines needed.
-    // Let's replace the whole card logic to insert buttons.
+    // Current Month Report for Pie Chart
+    const currentMonthReport = useMemo(() => getMonthlyReport(new Date()), [getMonthlyReport]);
 
+    // Calculate Gradient Offset for split coloring
     const gradientOffset = () => {
         const dataMax = Math.max(...data.map((i) => i.balance));
         const dataMin = Math.min(...data.map((i) => i.balance));
@@ -86,7 +86,6 @@ export default function Dashboard() {
     return (
         <div className="grid-layout">
             <header className="flex justify-between items-end">
-                {/* ... existing header content ... */}
                 <div>
                     <h1 className="text-3xl font-bold title-gradient">Vue d'ensemble</h1>
                     <p className="text-gray-400">Bienvenue, Lucas</p>
@@ -185,30 +184,47 @@ export default function Dashboard() {
                 </ResponsiveContainer>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Info Cards can go here */}
-                <div className="glass-panel p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Spending Pie Chart */}
+                <div className="glass-panel p-6 h-[300px]">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <PieChartIcon size={18} className="text-indigo-400" /> Dépenses par Catégorie
+                    </h3>
+                    <div className="h-[220px]">
+                        <SpendingChart items={currentMonthReport} />
+                    </div>
+                </div>
+
+                {/* Next Event */}
+                <div className="glass-panel p-6 h-[300px]">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                         <Calendar size={18} className="text-amber-400" /> Prochain Événement
                     </h3>
-                    {nextEvent ? (
-                        <div>
-                            <div className="text-2xl font-bold">{nextEvent.label}</div>
-                            <div className={`text-lg ${nextEvent.amount > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                {nextEvent.amount > 0 ? '+' : ''}{nextEvent.amount.toFixed(2)} €
+                    <div className="flex flex-col justify-center h-[200px]">
+                        {nextEvent ? (
+                            <div>
+                                <div className="text-2xl font-bold mb-2">{nextEvent.label}</div>
+                                <div className={`text-3xl font-bold mb-2 ${nextEvent.amount > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    {nextEvent.amount > 0 ? '+' : ''}{nextEvent.amount.toFixed(2)} €
+                                </div>
+                                <div className="text-gray-400">
+                                    Le {format(new Date(nextEvent.date), 'dd MMMM yyyy', { locale: fr })}
+                                </div>
                             </div>
-                            <div className="text-gray-500 text-sm mt-1">
-                                Le {format(new Date(nextEvent.date), 'dd MMMM yyyy', { locale: fr })}
-                            </div>
-                        </div>
-                    ) : (
-                        <p className="text-gray-500">Aucun événement planifié.</p>
-                    )}
+                        ) : (
+                            <p className="text-gray-500 text-center">Aucun événement planifié.</p>
+                        )}
+                    </div>
                 </div>
 
-                <div className="glass-panel p-6 flex flex-col justify-center items-center text-center">
-                    <Wallet size={32} className="text-indigo-400 mb-2" />
-                    <p className="text-gray-300">Gérez vos transactions dans l'onglet Budget</p>
+                {/* Quick Access / Summary */}
+                <div className="glass-panel p-6 h-[300px] flex flex-col justify-center items-center text-center">
+                    <Wallet size={48} className="text-indigo-400 mb-4" />
+                    <h3 className="text-xl font-semibold text-white mb-2">Budget Mensuel</h3>
+                    <p className="text-gray-400 mb-6">Gérez vos transactions et suivez vos dépenses en temps réel.</p>
+                    <button onClick={() => window.location.href = '/activity'} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
+                        Voir les détails
+                    </button>
                 </div>
             </div>
         </div>

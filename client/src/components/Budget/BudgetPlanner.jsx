@@ -5,7 +5,7 @@ import { Edit2, Trash2, Plus, X, Check } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function BudgetPlanner() {
-    const { recurring, addRecurringItem, updateRecurringItem, deleteRecurringItem } = useBudget();
+    const { recurring, addRecurringItem, updateRecurringItem, deleteRecurringItem, categories } = useBudget();
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState(null);
 
@@ -14,7 +14,7 @@ export default function BudgetPlanner() {
     const [amount, setAmount] = useState('');
     const [type, setType] = useState('expense');
     const [day, setDay] = useState('1');
-    const [category, setCategory] = useState('Utilities');
+    const [categoryId, setCategoryId] = useState('');
     const [isLimited, setIsLimited] = useState(false);
     const [duration, setDuration] = useState('');
     const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -24,7 +24,7 @@ export default function BudgetPlanner() {
         setAmount('');
         setType('expense');
         setDay('1');
-        setCategory('Utilities');
+        setCategoryId('');
         setIsLimited(false);
         setDuration('');
         setStartDate(format(new Date(), 'yyyy-MM-dd'));
@@ -39,7 +39,7 @@ export default function BudgetPlanner() {
         setAmount(Math.abs(item.amount));
         setType(item.type);
         setDay(item.dayOfMonth);
-        setCategory(item.category);
+        setCategoryId(item.category_id || categories.find(c => c.label === item.category)?.id || '');
         if (item.durationMonths) {
             setIsLimited(true);
             setDuration(item.durationMonths);
@@ -57,7 +57,8 @@ export default function BudgetPlanner() {
             amount: parseFloat(amount),
             type,
             dayOfMonth: parseInt(day),
-            category,
+            category: categories.find(c => c.id === categoryId)?.label || 'Divers',
+            categoryId,
             startDate: isLimited ? startDate : null,
             durationMonths: isLimited ? parseInt(duration) : null
         };
@@ -109,6 +110,21 @@ export default function BudgetPlanner() {
                         <div>
                             <label className="text-xs text-gray-400">Libellé</label>
                             <input type="text" required value={label} onChange={e => setLabel(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white" />
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-400">Catégorie</label>
+                            <select
+                                value={categoryId}
+                                onChange={e => setCategoryId(e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white"
+                            >
+                                <option value="">Choisir...</option>
+                                {categories.map(cat => (
+                                    <option key={cat.id} value={cat.id}>
+                                        {cat.label}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                         <div className="flex gap-4">
                             <div className="flex-1">

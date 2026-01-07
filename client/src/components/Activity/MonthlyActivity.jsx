@@ -5,7 +5,7 @@ import { fr } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Calculator, CheckCircle, Clock, Edit2, Trash2 } from 'lucide-react';
 
 export default function MonthlyActivity() {
-    const { getMonthlyReport, updateTransaction, addTransaction, deleteTransaction } = useBudget();
+    const { getMonthlyReport, updateTransaction, addTransaction, deleteTransaction, categories } = useBudget();
     const [currentMonth, setCurrentMonth] = useState(new Date());
 
     // Edit State
@@ -31,13 +31,14 @@ export default function MonthlyActivity() {
             amount: Math.abs(item.amount),
             type: item.amount < 0 ? 'expense' : 'income',
             date: format(item.dateObj, 'yyyy-MM-dd'),
-            status: item.status || 'recurring' // 'recurring' effectively means 'planned' in UI context here
+            status: item.status || 'recurring', // 'recurring' effectively means 'planned' in UI context here
+            categoryId: item.category_id || categories.find(c => c.label === item.category)?.id || ''
         });
     };
 
     const closeEdit = () => {
         setEditingItem(null);
-        setEditForm({ label: '', amount: '', type: 'expense', date: '', status: 'confirmed' });
+        setEditForm({ label: '', amount: '', type: 'expense', date: '', status: 'confirmed', categoryId: '' });
     };
 
     const handleDelete = () => {
@@ -77,7 +78,9 @@ export default function MonthlyActivity() {
                 amount: amount,
                 type: type,
                 date: editForm.date,
-                status: status
+                status: status,
+                category_id: editForm.categoryId,
+                category: categories.find(c => c.id === editForm.categoryId)?.label || editingItem.category
             });
         } else {
             // It is a Projection -> CREATE (Realize)
@@ -86,7 +89,9 @@ export default function MonthlyActivity() {
                 amount: amount,
                 type: type,
                 date: editForm.date,
-                category: editingItem.category,
+                date: editForm.date,
+                category_id: editForm.categoryId,
+                category: categories.find(c => c.id === editForm.categoryId)?.label || editingItem.category,
                 recurringId: editingItem.id, // Link to rule/plan ID
                 status: status
             });
@@ -140,6 +145,22 @@ export default function MonthlyActivity() {
                                         className="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white focus:border-indigo-500 outline-none"
                                     />
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="text-sm text-gray-400">Catégorie</label>
+                                <select
+                                    value={editForm.categoryId}
+                                    onChange={e => setEditForm({ ...editForm, categoryId: e.target.value })}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white focus:border-indigo-500 outline-none"
+                                >
+                                    <option value="">Non catégorisé</option>
+                                    {categories.map(cat => (
+                                        <option key={cat.id} value={cat.id}>
+                                            {cat.label}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
 
                             <div>

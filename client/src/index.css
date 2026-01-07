@@ -74,4 +74,13 @@ body {
   display: grid;
   gap: 1.5rem;
   padding: 1.5rem;
+  /* Default to 1 column */
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .grid-layout {
+    /* Larger screens can override this locally or use specific grid classes */
+    grid-template-columns: 1fr;
+  }
 }

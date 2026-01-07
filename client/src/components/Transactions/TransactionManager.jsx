@@ -5,12 +5,13 @@ import { fr } from 'date-fns/locale';
 import { CheckCircle, Circle, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 export default function TransactionManager() {
-    const { recurring, planned, transactions, addTransaction, isPaidThisMonth } = useBudget();
+    const { recurring, planned, transactions, addTransaction, isPaidThisMonth, categories } = useBudget();
     const [amount, setAmount] = useState('');
     const [label, setLabel] = useState('');
     const [type, setType] = useState('expense');
     const [status, setStatus] = useState('confirmed');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [categoryId, setCategoryId] = useState('');
 
     // Simple "Add" handler
     const handleSubmit = (e) => {
@@ -21,12 +22,14 @@ export default function TransactionManager() {
             amount: parseFloat(amount),
             type,
             date: new Date(date).toISOString(),
-            category: 'Manual',
+            category: categories.find(c => c.id === categoryId)?.label || 'Manual',
+            categoryId: categoryId,
             status // 'confirmed' or 'planned'
         });
         setAmount('');
         setLabel('');
         setStatus('confirmed');
+        setCategoryId('');
         setDate(new Date().toISOString().split('T')[0]);
     };
 
@@ -37,7 +40,9 @@ export default function TransactionManager() {
                 amount: item.amount,
                 type: item.type,
                 date: new Date().toISOString(),
+                date: new Date().toISOString(),
                 category: item.category,
+                categoryId: item.category_id,
                 recurringId: item.id,
                 status: 'confirmed'
             });
@@ -93,6 +98,24 @@ export default function TransactionManager() {
                                 onChange={(e) => setDate(e.target.value)}
                                 className="w-full bg-[#0f172a] border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-indigo-500"
                             />
+                        </div>
+
+                        <div className="flex gap-4">
+                            <div className="flex-1">
+                                <label className="block text-sm text-gray-400 mb-1">Catégorie</label>
+                                <select
+                                    value={categoryId}
+                                    onChange={(e) => setCategoryId(e.target.value)}
+                                    className="w-full bg-[#0f172a] border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-indigo-500"
+                                >
+                                    <option value="">Non catégorisé</option>
+                                    {categories.map(cat => (
+                                        <option key={cat.id} value={cat.id}>
+                                            {cat.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
 
                         <div className="flex gap-4">

@@ -14,18 +14,20 @@ export const BudgetProvider = ({ children }) => {
     const [recurring, setRecurring] = useState([]);
     const [planned, setPlanned] = useState([]); // Legacy planned items if any
     const [savingsGoals, setSavingsGoals] = useState([]);
+    const [categories, setCategories] = useState([]);
     const [initialBalance, setInitialBalanceState] = useState(0);
 
     // Initial Load
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [txnsRes, recRes, planRes, saveRes, balRes] = await Promise.all([
+                const [txnsRes, recRes, planRes, saveRes, balRes, catsRes] = await Promise.all([
                     fetch(`${API_URL}/transactions`),
                     fetch(`${API_URL}/recurring`),
                     fetch(`${API_URL}/planned`),
                     fetch(`${API_URL}/savings`),
-                    fetch(`${API_URL}/settings/initialBalance`)
+                    fetch(`${API_URL}/settings/initialBalance`),
+                    fetch(`${API_URL}/categories`)
                 ]);
 
                 const txns = await txnsRes.json();
@@ -33,11 +35,13 @@ export const BudgetProvider = ({ children }) => {
                 const plans = await planRes.json();
                 const saves = await saveRes.json();
                 const bal = await balRes.json();
+                const cats = await catsRes.json();
 
                 setTransactions(txns ? txns.map(t => ({ ...t, recurringId: t.recurring_id || t.recurringId })) : []);
                 setRecurring(recs || []);
                 setPlanned(plans || []);
                 setSavingsGoals(saves || []);
+                setCategories(cats || []);
                 setInitialBalanceState(Number(bal) || 0);
             } catch (error) {
                 console.error("Failed to load data:", error);
@@ -131,6 +135,30 @@ export const BudgetProvider = ({ children }) => {
 
     const addSavingsGoal = async (goal) => {
         setSavingsGoals(prev => [...prev, { ...goal, id: uuidv4() }]);
+    };
+
+    const addCategory = async (cat) => {
+        const res = await fetch(`${API_URL}/categories`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cat)
+        });
+        const saved = await res.json();
+        setCategories(prev => [...prev, saved].sort((a, b) => a.label.localeCompare(b.label)));
+    };
+
+    const updateCategory = async (id, cat) => {
+        await fetch(`${API_URL}/categories/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cat)
+        });
+        setCategories(prev => prev.map(c => c.id === id ? { ...c, ...cat } : c).sort((a, b) => a.label.localeCompare(b.label)));
+    };
+
+    const deleteCategory = async (id) => {
+        await fetch(`${API_URL}/categories/${id}`, { method: 'DELETE' });
+        setCategories(prev => prev.filter(c => c.id !== id));
     };
 
     // Generic Event Generation (Same logic, mostly pure function using state)
@@ -270,6 +298,7 @@ export const BudgetProvider = ({ children }) => {
         recurring,
         planned,
         savingsGoals,
+        categories,
         getProjection,
         addTransaction,
         addSavingsGoal,
@@ -278,6 +307,9 @@ export const BudgetProvider = ({ children }) => {
         deleteRecurringItem,
         updateTransaction,
         deleteTransaction,
+        addCategory,
+        updateCategory,
+        deleteCategory,
         isPaidThisMonth,
         initialBalance,
         setInitialBalance,

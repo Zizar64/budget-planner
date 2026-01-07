@@ -68,6 +68,29 @@ const init = async () => {
             )
         `);
 
+        // Categories Table
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS categories (
+                id TEXT PRIMARY KEY,
+                label TEXT NOT NULL,
+                type TEXT NOT NULL,
+                color TEXT,
+                icon TEXT
+            )
+        `);
+
+        // Add category_id to Transactions
+        await client.query(`
+            ALTER TABLE transactions 
+            ADD COLUMN IF NOT EXISTS category_id TEXT REFERENCES categories(id) ON DELETE SET NULL
+        `);
+
+        // Add category_id to Recurring Items
+        await client.query(`
+            ALTER TABLE recurring_items 
+            ADD COLUMN IF NOT EXISTS category_id TEXT REFERENCES categories(id) ON DELETE SET NULL
+        `);
+
         // Users Table
         await client.query(`
             CREATE TABLE IF NOT EXISTS users (
@@ -83,6 +106,27 @@ const init = async () => {
             const hashedPassword = bcrypt.hashSync('admin', 10);
             await client.query('INSERT INTO users (id, username, password) VALUES ($1, $2, $3)', [uuidv4(), 'admin', hashedPassword]);
             console.log('Default admin user created: admin/admin');
+        }
+
+        // Seed default categories if not exists
+        const categoryCountRes = await client.query('SELECT count(*) FROM categories');
+        if (parseInt(categoryCountRes.rows[0].count) === 0) {
+            const defaultCategories = [
+                { label: 'Logement', type: 'expense', color: '#EF4444', icon: 'Home' },
+                { label: 'Alimentation', type: 'expense', color: '#F59E0B', icon: 'ShoppingCart' },
+                { label: 'Transport', type: 'expense', color: '#3B82F6', icon: 'Car' },
+                { label: 'Loisirs', type: 'expense', color: '#8B5CF6', icon: 'Gamepad2' },
+                { label: 'Salaire', type: 'income', color: '#10B981', icon: 'Banknote' },
+                { label: 'Divers', type: 'expense', color: '#6B7280', icon: 'MoreHorizontal' }
+            ];
+
+            for (const cat of defaultCategories) {
+                await client.query(
+                    'INSERT INTO categories (id, label, type, color, icon) VALUES ($1, $2, $3, $4, $5)',
+                    [uuidv4(), cat.label, cat.type, cat.color, cat.icon]
+                );
+            }
+            console.log('Default categories seeded');
         }
 
         // Planned Exceptions

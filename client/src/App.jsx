@@ -36,8 +36,8 @@ const ProtectedLayout = () => {
 
   return (
     <div className="flex min-h-screen bg-[var(--bg-primary)]">
-      {/* Sidebar */}
-      <nav className="w-64 border-r border-[var(--border-color)] p-6 flex flex-col gap-8 bg-[var(--bg-secondary)]">
+      {/* Desktop Sidebar */}
+      <nav className="hidden md:flex w-64 border-r border-[var(--border-color)] p-6 flex-col gap-8 bg-[var(--bg-secondary)] fixed h-full z-20">
         <div className="flex items-center gap-3 px-2">
           <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center">
             <span className="font-bold text-white">B</span>
@@ -69,9 +69,20 @@ const ProtectedLayout = () => {
       </nav>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto w-full md:pl-64 pb-20 md:pb-0">
         <Outlet />
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] px-4 py-2 flex justify-between items-center z-50 safe-area-bottom">
+        <NavItem to="/" icon={LayoutDashboard} label="" />
+        <NavItem to="/activity" icon={Calendar} label="" />
+        <button onClick={() => window.location.href = '/transactions'} className="bg-indigo-600 p-3 rounded-full -mt-8 shadow-lg border-4 border-[var(--bg-primary)]">
+          <CreditCard size={24} className="text-white" />
+        </button>
+        <NavItem to="/budget" icon={Wallet} label="" />
+        <NavItem to="/settings" icon={SettingsIcon} label="" />
+      </nav>
     </div>
   );
 };
