@@ -40,6 +40,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
+app.use(express.static('../client/dist'));
 
 // --- AUTH MIDDLEWARE ---
 const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
@@ -576,6 +577,11 @@ app.post('/api/restore', authenticateToken, async (req: Request, res: Response) 
     } finally {
         client.release();
     }
+});
+
+// Serve index.html for any other requests (SPA Support)
+app.get('*', (req, res) => {
+    res.sendFile('index.html', { root: '../client/dist' });
 });
 
 const startServer = async () => {
