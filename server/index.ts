@@ -580,7 +580,7 @@ app.post('/api/restore', authenticateToken, async (req: Request, res: Response) 
 });
 
 // Serve index.html for any other requests (SPA Support)
-app.get('*', (req, res) => {
+app.use((req, res) => {
     res.sendFile('index.html', { root: '../client/dist' });
 });
 

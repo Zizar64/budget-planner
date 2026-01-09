@@ -1,0 +1,19 @@
+[Unit]
+Description=Budget Planner
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/budget-planner/server
+ExecStart=/bin/node dist/index.js
+Restart=always
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=POSTGRES_USER=budget
+Environment=POSTGRES_PASSWORD=budget
+Environment=POSTGRES_DB=budget_planner
+Environment=JWT_SECRET=prod_secret_zizar64
+
+[Install]
+WantedBy=multi-user.target
