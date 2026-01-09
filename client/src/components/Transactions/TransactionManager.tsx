@@ -6,7 +6,7 @@ import { CheckCircle, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { RecurringItem } from '../../types';
 
 export default function TransactionManager() {
-    const { recurring, transactions, addTransaction, isPaidThisMonth, categories } = useBudget();
+    const { recurring, transactions, addTransaction, isPaidThisMonth, isSkippedThisMonth, categories } = useBudget();
     const [amount, setAmount] = useState('');
     const [label, setLabel] = useState('');
     const [type, setType] = useState<'income' | 'expense'>('expense');
@@ -205,7 +205,7 @@ export default function TransactionManager() {
             <div className="glass-panel p-6 mt-6">
                 <h2 className="text-xl font-semibold mb-4">Charges & Revenus Planifiés (Ce mois)</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {recurring.map(item => {
+                    {recurring.filter(item => !isSkippedThisMonth(item.id)).map(item => {
                         const isPaid = isPaidThisMonth(item.id);
                         return (
                             <div key={item.id} className={`p-4 rounded-xl border flex justify-between items-center ${isPaid ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-gray-800 bg-[#0f172a]/30'}`}>

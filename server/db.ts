@@ -1,7 +1,9 @@
+import { v4 as uuidv4 } from 'uuid';
+import bcrypt from 'bcryptjs';
 import pg from 'pg';
 const { Pool } = pg;
 
-const pool = new Pool({
+export const pool = new Pool({
     user: process.env.POSTGRES_USER || 'myuser',
     host: process.env.POSTGRES_HOST || 'db',
     database: process.env.POSTGRES_DB || 'budget_db',
@@ -15,7 +17,7 @@ export const initDB = async () => {
     try {
         await pool.query(`
             CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
+                id TEXT PRIMARY KEY,
                 username VARCHAR(50) UNIQUE NOT NULL,
                 password VARCHAR(255) NOT NULL
             );
@@ -36,7 +38,7 @@ export const initDB = async () => {
                 id TEXT PRIMARY KEY,
                 label VARCHAR(100) NOT NULL,
                 amount DECIMAL(10, 2) NOT NULL,
-                date VARCHAR(10) NOT NULL,
+                date DATE NOT NULL,
                 type VARCHAR(10) CHECK (type IN ('income', 'expense')) NOT NULL,
                 category VARCHAR(50),
                 category_id TEXT REFERENCES categories(id) ON DELETE SET NULL,
@@ -51,11 +53,11 @@ export const initDB = async () => {
                 label VARCHAR(100) NOT NULL,
                 amount DECIMAL(10, 2) NOT NULL,
                 type VARCHAR(10) CHECK (type IN ('income', 'expense')) NOT NULL,
-                date VARCHAR(100),
                 category VARCHAR(50),
-                category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+                category_id TEXT REFERENCES categories(id) ON DELETE SET NULL,
                 day_of_month INTEGER,
-                start_date VARCHAR(10),
+                start_date DATE,
+                end_date DATE,
                 duration_months INTEGER
             );
         `);
@@ -65,9 +67,10 @@ export const initDB = async () => {
                 id VARCHAR(50) PRIMARY KEY,
                 label VARCHAR(100) NOT NULL,
                 amount DECIMAL(10, 2) NOT NULL,
-                date VARCHAR(10) NOT NULL,
+                date DATE NOT NULL,
                 type VARCHAR(10) CHECK (type IN ('income', 'expense')) NOT NULL,
-                category VARCHAR(50)
+                category VARCHAR(50),
+                status VARCHAR(20) DEFAULT 'planned'
             );
         `);
 
@@ -77,14 +80,14 @@ export const initDB = async () => {
                 label VARCHAR(100) NOT NULL,
                 target_amount DECIMAL(10, 2) NOT NULL,
                 current_amount DECIMAL(10, 2) DEFAULT 0,
-                deadline VARCHAR(10)
+                deadline DATE
             );
         `);
 
         await pool.query(`
             CREATE TABLE IF NOT EXISTS settings (
                 key VARCHAR(50) PRIMARY KEY,
-                value TEXT NOT NULL
+                value JSONB NOT NULL
             );
         `);
 
@@ -103,10 +106,21 @@ export const initDB = async () => {
 
             for (const cat of defaults) {
                 await pool.query(
-                    'INSERT INTO categories (label, type, color, icon) VALUES ($1, $2, $3, $4)',
-                    cat
+                    'INSERT INTO categories (id, label, type, color, icon) VALUES ($1, $2, $3, $4, $5)',
+                    [uuidv4(), ...cat]
                 );
             }
+        }
+
+        // Seed Default User
+        const userCount = await pool.query('SELECT COUNT(*) FROM users');
+        if (parseInt(userCount.rows[0].count) === 0) {
+            console.log("Seeding default user...");
+            const hashedPassword = bcrypt.hashSync('admin', 10);
+            await pool.query(
+                'INSERT INTO users (id, username, password) VALUES ($1, $2, $3)',
+                [uuidv4(), 'admin', hashedPassword]
+            );
         }
 
         console.log("Database initialized");

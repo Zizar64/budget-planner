@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import { query } from './db.js'; // Note: in node next with standard import, .js extension is required or use --experimental-specifier-resolution=node. TypeScript resolves .js to .ts source.
+import { query, pool, initDB } from './db.js';
 import { v4 as uuidv4 } from 'uuid';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
@@ -8,25 +8,34 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import zlib from 'zlib';
 import { promisify } from 'util';
-import pg from 'pg'; // For Pool wrapper types if needed, but db.ts handles query
+import pg from 'pg';
 
 const gzip = promisify(zlib.gzip);
 const gunzip = promisify(zlib.gunzip);
 
 const app = express();
 const port = 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-it-in-prod';
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-unsafe-secret';
+
+if (!process.env.JWT_SECRET) {
+    if (process.env.NODE_ENV === 'production') {
+        console.error("FATAL: JWT_SECRET must be defined in production.");
+        process.exit(1);
+    } else {
+        console.warn("WARNING: JWT_SECRET not defined, using default unsafe secret.");
+    }
+}
 
 // Extend Request type
 interface AuthRequest extends Request {
     user?: {
-        id: number;
+        id: string;
         username: string;
     };
 }
 
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: ['http://localhost:5173', 'http://localhost:8080'],
     credentials: true
 }));
 app.use(express.json());
@@ -111,7 +120,7 @@ app.get('/api/settings/:key', authenticateToken, async (req: Request, res: Respo
     try {
         const result = await query('SELECT value FROM settings WHERE key = $1', [req.params.key]);
         const row = result.rows[0];
-        res.json(row ? JSON.parse(row.value) : null);
+        res.json(row ? row.value : null);
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
@@ -122,7 +131,7 @@ app.post('/api/settings', authenticateToken, async (req: Request, res: Response)
     try {
         await query(
             'INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
-            [key, JSON.stringify(value)]
+            [key, value]
         );
         res.json({ success: true });
     } catch (err: any) {
@@ -467,26 +476,113 @@ app.post('/api/restore', authenticateToken, async (req: Request, res: Response) 
         return;
     }
 
-    // We need a dedicated client for transaction
-    // Assuming query() uses pool.query, standard pg pool.query handles transactions if we just execute statements? 
-    // No, standard pool.query auto-commits. We need a client.
-    // In db.ts, we only exported 'query'. We need to export 'pool' or a function to get a client.
-    // For now, let's just use simple queries with risk, OR update db.ts to export pool.
-    // I will update db.ts to export pool so I can get a client.
+    const client = await pool.connect();
 
-    // TEMPORARY FIX: I will import pool from db.ts in next step or use direct pg import here.
-    // Actually I can just use pool directly if I import logic differently.
-    // Getting client is better.
-    // For this step I'll assume 'query' works but without transaction safety for now, or assume I fix db.ts.
-    // Wait, the previous JS code used db.connect().
+    try {
+        await client.query('BEGIN');
 
-    // I will stick to what the JS code did but I need access to db.connect().
-    // my db.ts exports { query, initDB }. It does NOT export pool.
-    // I should update db.ts to export pool.
+        // Order matters due to foreign keys!
+        // 1. Clear dependent tables first
+        // transactions -> recurring/category/users?? No transactions ref category.
+        // recurring_items -> category
+        // planned_items -> category?? (No FK in create table but logic might exist)
+        // categories -> none
+        // users -> none (but used for auth)
+        // settings -> none
+        // savings_goals -> none
 
-    res.status(501).json({ error: "Restore refactoring pending db.ts update" });
+        // We should clear in reverse dependency order:
+        // transactions, recurring_items, planned_items, savings_goals, settings, categories, users
+        // NOTE: We probably don't want to clear the CURRENT user if possible, but a restore usually wipes everything.
+        // However, if we wipe users, the current token might become invalid immediately? 
+        // Yes, but we just want to restore data. Ideally we keep the same users or re-insert them.
+
+        await client.query('TRUNCATE transactions, recurring_items, planned_items, savings_goals, settings, categories, users RESTART IDENTITY CASCADE');
+
+        // 2. Insert Users
+        if (data.users && data.users.length > 0) {
+            for (const u of data.users) {
+                await client.query('INSERT INTO users (id, username, password) VALUES ($1, $2, $3)', [u.id, u.username, u.password]);
+            }
+        }
+
+        // 3. Insert Categories
+        if (data.categories && data.categories.length > 0) {
+            for (const c of data.categories) {
+                await client.query(
+                    'INSERT INTO categories (id, label, type, color, icon) VALUES ($1, $2, $3, $4, $5)',
+                    [c.id, c.label, c.type, c.color, c.icon]
+                );
+            }
+        }
+
+        // 4. Settings
+        if (data.settings && data.settings.length > 0) {
+            for (const s of data.settings) {
+                await client.query('INSERT INTO settings (key, value) VALUES ($1, $2)', [s.key, s.value]);
+            }
+        }
+
+        // 5. Savings Goals
+        if (data.savings_goals && data.savings_goals.length > 0) {
+            for (const s of data.savings_goals) {
+                await client.query(
+                    'INSERT INTO savings_goals (id, label, target_amount, current_amount, deadline) VALUES ($1, $2, $3, $4, $5)',
+                    [s.id, s.label, s.target_amount, s.current_amount, s.deadline]
+                );
+            }
+        }
+
+        // 6. Planned Items
+        if (data.planned_items && data.planned_items.length > 0) {
+            for (const p of data.planned_items) {
+                await client.query(
+                    'INSERT INTO planned_items (id, label, amount, date, type, category, status) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                    [p.id, p.label, p.amount, p.date, p.type, p.category, p.status]
+                );
+            }
+        }
+
+        // 7. Recurring Items
+        if (data.recurring_items && data.recurring_items.length > 0) {
+            for (const r of data.recurring_items) {
+                // Handle potential missing fields if schema changed?
+                await client.query(
+                    `INSERT INTO recurring_items (id, label, amount, type, category, category_id, day_of_month, start_date, end_date, duration_months)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                    [r.id, r.label, r.amount, r.type, r.category, r.category_id, r.day_of_month, r.start_date, r.end_date, r.duration_months]
+                );
+            }
+        }
+
+        // 8. Transactions
+        if (data.transactions && data.transactions.length > 0) {
+            for (const t of data.transactions) {
+                await client.query(
+                    `INSERT INTO transactions (id, label, amount, date, type, category, category_id, status, recurring_id)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                    [t.id, t.label, t.amount, t.date, t.type, t.category, t.category_id, t.status, t.recurring_id]
+                );
+            }
+        }
+
+        await client.query('COMMIT');
+        res.json({ success: true, message: "Restore successful. Please log in again." });
+
+    } catch (err: any) {
+        await client.query('ROLLBACK');
+        console.error("Restore failed:", err);
+        res.status(500).json({ error: "Restore failed: " + err.message });
+    } finally {
+        client.release();
+    }
 });
 
-app.listen(port, () => {
-    console.log(`Backend server running at http://localhost:${port}`);
-});
+const startServer = async () => {
+    await initDB();
+    app.listen(port, () => {
+        console.log(`Backend server running at http://localhost:${port}`);
+    });
+};
+
+startServer();

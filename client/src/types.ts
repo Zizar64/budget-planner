@@ -50,6 +50,6 @@ export interface SavingsGoal {
 }
 
 export interface User {
-    id: number;
+    id: string;
     username: string;
 }

@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext, useCallback, useMemo, ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { addMonths, startOfMonth, endOfMonth, isSameMonth, parseISO, isBefore, isAfter, addDays, format } from 'date-fns';
+import { addMonths, startOfMonth, endOfMonth, isSameMonth, parseISO, isBefore, isAfter, addDays, format, startOfDay, endOfDay } from 'date-fns';
 import { Transaction, RecurringItem, PlannedItem, SavingsGoal, Category } from '../types';
 
 interface BudgetContextType {
@@ -22,6 +22,7 @@ interface BudgetContextType {
     updateCategory: (id: number | string, cat: Partial<Category>) => Promise<void>;
     deleteCategory: (id: number | string) => Promise<void>;
     isPaidThisMonth: (itemId: string) => boolean;
+    isSkippedThisMonth: (itemId: string) => boolean;
     initialBalance: number;
     setInitialBalance: (amount: number) => Promise<void>;
     getMonthlyReport: (date?: Date) => any[];
@@ -73,10 +74,10 @@ export const BudgetProvider: React.FC<BudgetProviderProps> = ({ children }) => {
                 const cats = await catsRes.json();
 
                 // Normalize data
-                setTransactions(txns ? txns.map((t: any) => ({ ...t, recurringId: t.recurring_id || t.recurringId })) : []);
-                setRecurring(recs || []);
-                setPlanned(plans || []);
-                setSavingsGoals(saves || []);
+                setTransactions(txns ? txns.map((t: any) => ({ ...t, amount: Number(t.amount), recurringId: t.recurring_id || t.recurringId })) : []);
+                setRecurring(recs ? recs.map((r: any) => ({ ...r, amount: Number(r.amount) })) : []);
+                setPlanned(plans ? plans.map((p: any) => ({ ...p, amount: Number(p.amount) })) : []);
+                setSavingsGoals(saves ? saves.map((s: any) => ({ ...s, target_amount: Number(s.target_amount), current_amount: Number(s.current_amount) })) : []);
                 setCategories(cats || []);
                 setInitialBalanceState(Number(bal) || 0);
             } catch (error) {
@@ -116,7 +117,7 @@ export const BudgetProvider: React.FC<BudgetProviderProps> = ({ children }) => {
             body: JSON.stringify(newTxn)
         });
         const savedTxn = await res.json();
-        setTransactions(prev => [...prev, { ...savedTxn, recurringId: savedTxn.recurring_id || savedTxn.recurringId }]);
+        setTransactions(prev => [...prev, { ...savedTxn, amount: Number(savedTxn.amount), recurringId: savedTxn.recurring_id || savedTxn.recurringId }]);
     };
 
     const updateTransaction = async (id: string, updatedFields: Partial<Transaction>) => {
@@ -152,7 +153,7 @@ export const BudgetProvider: React.FC<BudgetProviderProps> = ({ children }) => {
             body: JSON.stringify(item)
         });
         const saved = await res.json();
-        setRecurring(prev => [...prev, saved]);
+        setRecurring(prev => [...prev, { ...saved, amount: Number(saved.amount) }]);
     };
 
     const updateRecurringItem = async (id: string, updatedItem: Partial<RecurringItem>) => {
@@ -201,11 +202,13 @@ export const BudgetProvider: React.FC<BudgetProviderProps> = ({ children }) => {
     // Generic Event Generation
     const getEventsForPeriod = useCallback((startDate: Date, endDate: Date) => {
         const events: any[] = [];
+        const start = startOfDay(startDate);
+        const end = endOfDay(endDate);
 
         // 1. One-off Planned Items
         planned.forEach(item => {
             const d = parseISO(item.date);
-            if (isAfter(d, startDate) && isBefore(d, endDate)) {
+            if (!isBefore(d, start) && !isAfter(d, end)) {
                 events.push({ ...item, dateObj: d, status: 'planned' });
             }
         });
@@ -213,20 +216,20 @@ export const BudgetProvider: React.FC<BudgetProviderProps> = ({ children }) => {
         // 2. Planned Transactions
         transactions.filter(t => t.status === 'planned').forEach(t => {
             const d = parseISO(t.date);
-            if (isAfter(d, startDate) && isBefore(d, endDate)) {
+            if (!isBefore(d, start) && !isAfter(d, end)) {
                 events.push({ ...t, dateObj: d, status: 'planned' });
             }
         });
 
         // 3. Recurring Items
-        let iterDate = startOfMonth(startDate);
-        while (isBefore(iterDate, endDate)) {
+        let iterDate = startOfMonth(start);
+        while (isBefore(iterDate, end)) {
             recurring.forEach(rec => {
                 if (rec.durationMonths && rec.startDate) {
-                    const start = parseISO(rec.startDate);
-                    const end = addMonths(start, Number(rec.durationMonths));
+                    const recStart = parseISO(rec.startDate);
+                    const recEnd = addMonths(recStart, Number(rec.durationMonths));
                     const currentMonth = startOfMonth(iterDate);
-                    if (isBefore(currentMonth, startOfMonth(start)) || isAfter(currentMonth, endOfMonth(end))) {
+                    if (isBefore(currentMonth, startOfMonth(recStart)) || isAfter(currentMonth, endOfMonth(recEnd))) {
                         return;
                     }
                 }
@@ -243,7 +246,7 @@ export const BudgetProvider: React.FC<BudgetProviderProps> = ({ children }) => {
                 );
                 if (hasMatch) return;
 
-                if (isAfter(itemDate, startDate) && isBefore(itemDate, endDate)) {
+                if (!isBefore(itemDate, start) && !isAfter(itemDate, end)) {
                     events.push({
                         ...rec,
                         date: format(itemDate, 'yyyy-MM-dd'),
@@ -315,7 +318,18 @@ export const BudgetProvider: React.FC<BudgetProviderProps> = ({ children }) => {
         return transactions.some(t =>
             t.recurringId === itemId &&
             t.date &&
-            t.date.startsWith(currentMonthStart)
+            t.date.startsWith(currentMonthStart) &&
+            t.status === 'confirmed'
+        );
+    }, [transactions]);
+
+    const isSkippedThisMonth = useCallback((itemId: string) => {
+        const currentMonthStart = format(new Date(), 'yyyy-MM');
+        return transactions.some(t =>
+            t.recurringId === itemId &&
+            t.date &&
+            t.date.startsWith(currentMonthStart) &&
+            t.status === 'skipped'
         );
     }, [transactions]);
 
@@ -338,13 +352,14 @@ export const BudgetProvider: React.FC<BudgetProviderProps> = ({ children }) => {
         updateCategory,
         deleteCategory,
         isPaidThisMonth,
+        isSkippedThisMonth,
         initialBalance,
         setInitialBalance,
         getMonthlyReport,
         getEventsForPeriod
     }), [
         balance, transactions, recurring, planned, savingsGoals, initialBalance,
-        getProjection, getEventsForPeriod, getMonthlyReport, isPaidThisMonth
+        getProjection, getEventsForPeriod, getMonthlyReport, isPaidThisMonth, isSkippedThisMonth
     ]);
 
     return (
