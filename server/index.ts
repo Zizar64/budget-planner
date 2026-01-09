@@ -479,8 +479,37 @@ app.post('/api/restore', authenticateToken, async (req: Request, res: Response) 
 
     const client = await pool.connect();
 
+    let restoredData: any;
+
+    try {
+        // --- DECRYPTION & DECOMPRESSION ---
+        const base64Data = data.includes(',') ? data.split(',')[1] : data;
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        const iv = buffer.subarray(0, 16);
+        const authTag = buffer.subarray(16, 32);
+        const encrypted = buffer.subarray(32);
+
+        const key = getEncryptionKey();
+        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+        decipher.setAuthTag(authTag);
+
+        const compressed = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+        const jsonStr = (await gunzip(compressed)).toString();
+        restoredData = JSON.parse(jsonStr);
+
+    } catch (err: any) {
+        console.error("Decryption failed:", err);
+        res.status(400).json({ error: "Invalid or corrupted backup file." });
+        client.release();
+        return;
+    }
+
     try {
         await client.query('BEGIN');
+
+        // Use the parsed data
+        const data = restoredData;
 
         // Order matters due to foreign keys!
         // 1. Clear dependent tables first
