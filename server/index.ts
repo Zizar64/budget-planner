@@ -490,17 +490,29 @@ app.post('/api/restore', authenticateToken, async (req: Request, res: Response) 
         const authTag = buffer.subarray(16, 32);
         const encrypted = buffer.subarray(32);
 
-        const key = getEncryptionKey();
-        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-        decipher.setAuthTag(authTag);
+        // Try with current secret
+        let key = getEncryptionKey();
 
-        const compressed = Buffer.concat([decipher.update(encrypted), decipher.final()]);
-        const jsonStr = (await gunzip(compressed)).toString();
-        restoredData = JSON.parse(jsonStr);
+        try {
+            const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+            decipher.setAuthTag(authTag);
+            const compressed = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+            const jsonStr = (await gunzip(compressed)).toString();
+            restoredData = JSON.parse(jsonStr);
+        } catch (primaryErr) {
+            console.warn("Decryption with primary key failed, trying default secret...");
+            // Fallback: Try with default unsafe secret
+            key = crypto.createHash('sha256').update('dev-unsafe-secret').digest();
+            const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+            decipher.setAuthTag(authTag);
+            const compressed = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+            const jsonStr = (await gunzip(compressed)).toString();
+            restoredData = JSON.parse(jsonStr);
+        }
 
     } catch (err: any) {
         console.error("Decryption failed:", err);
-        res.status(400).json({ error: "Invalid or corrupted backup file." });
+        res.status(400).json({ error: "Invalid or corrupted backup file (Wrong Key)." });
         client.release();
         return;
     }
