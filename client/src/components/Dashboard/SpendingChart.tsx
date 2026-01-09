@@ -1,8 +1,12 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { useBudget } from '../../context/BudgetContext';
 
-export default function SpendingChart({ items }) {
+interface SpendingChartProps {
+    items: any[]; // Or define a tighter interface for report items
+}
+
+export default function SpendingChart({ items }: SpendingChartProps) {
     const { categories } = useBudget();
 
     const data = useMemo(() => {
@@ -10,9 +14,9 @@ export default function SpendingChart({ items }) {
         const expenses = items.filter(item => item.amount < 0);
 
         // 2. Group by category
-        const groups = {};
+        const groups: Record<string, any> = {};
         expenses.forEach(item => {
-            const catId = item.category_id || 'uncategorized';
+            const catId = item.category_id?.toString() || 'uncategorized';
             const catLabel = item.category || 'Non catégorisé';
 
             if (!groups[catId]) {
@@ -27,17 +31,17 @@ export default function SpendingChart({ items }) {
 
         // 3. Convert to array and sort
         return Object.values(groups)
-            .sort((a, b) => b.value - a.value); // Sort by highest spending
+            .sort((a: any, b: any) => b.value - a.value); // Sort by highest spending
     }, [items]);
 
     // Helper to get color
-    const getColor = (catId) => {
+    const getColor = (catId: string) => {
         if (catId === 'uncategorized') return '#94a3b8'; // gray-400
-        const cat = categories.find(c => c.id === catId);
+        const cat = categories.find(c => c.id.toString() === catId);
         return cat ? cat.color : '#94a3b8';
     };
 
-    const CustomTooltip = ({ active, payload }) => {
+    const CustomTooltip = ({ active, payload }: any) => {
         if (active && payload && payload.length) {
             const data = payload[0].payload;
             return (
@@ -72,7 +76,7 @@ export default function SpendingChart({ items }) {
                         dataKey="value"
                         stroke="none"
                     >
-                        {data.map((entry, index) => (
+                        {data.map((entry: any, index: number) => (
                             <Cell key={`cell-${index}`} fill={getColor(entry.id)} />
                         ))}
                     </Pie>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Lock } from 'lucide-react';
@@ -11,7 +11,7 @@ export default function Login() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError('');
@@ -20,7 +20,7 @@ export default function Login() {
         if (result.success) {
             navigate('/');
         } else {
-            setError(result.error);
+            setError(result.error || 'Login failed');
             setLoading(false);
         }
     };

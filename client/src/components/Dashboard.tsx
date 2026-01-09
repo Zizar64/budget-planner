@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, FormEvent } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { TrendingDown, TrendingUp, Wallet, Calendar, Edit2, Check, Download, PieChart as PieChartIcon } from 'lucide-react';
+import { TrendingUp, Wallet, Calendar, Edit2, Check, Download, PieChart as PieChartIcon } from 'lucide-react';
 import { format, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import SpendingChart from './Dashboard/SpendingChart';
@@ -17,7 +17,7 @@ export default function Dashboard() {
         setIsEditingBalance(true);
     };
 
-    const handleBalanceSave = (e) => {
+    const handleBalanceSave = (e: FormEvent) => {
         e.preventDefault();
         const newCurrent = parseFloat(editBalanceValue);
         if (!isNaN(newCurrent)) {
@@ -56,7 +56,7 @@ export default function Dashboard() {
     const off = gradientOffset();
 
     // Custom Tooltip
-    const CustomTooltip = ({ active, payload, label }) => {
+    const CustomTooltip = ({ active, payload, label }: any) => {
         if (active && payload && payload.length) {
             const val = payload[0].value;
             return (
@@ -80,7 +80,7 @@ export default function Dashboard() {
         const futureEvents = getEventsForPeriod(new Date(), addMonths(new Date(), 3));
         // Filter events strictly in future and take the first one
         const now = new Date();
-        return futureEvents.find(e => new Date(e.date) > now);
+        return futureEvents.find((e: any) => new Date(e.date) > now);
     }, [getEventsForPeriod]);
 
     return (

@@ -1,9 +1,16 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { User } from '../types';
 
-const AuthContext = createContext(null);
+interface AuthContextType {
+    user: User | null;
+    login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
+    logout: () => Promise<void>;
+}
 
-export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
+const AuthContext = createContext<AuthContextType | null>(null);
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+    const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -25,14 +32,14 @@ export const AuthProvider = ({ children }) => {
         checkAuth();
     }, []);
 
-    const login = async (username, password) => {
+    const login = async (username: string, password: string) => {
         try {
             console.log("Attempting login for:", username);
             const res = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password }),
-                credentials: 'include' // Important for cookies
+                credentials: 'include'
             });
 
             console.log("Login response status:", res.status);
@@ -48,12 +55,10 @@ export const AuthProvider = ({ children }) => {
                     errorMsg = err.error || errorMsg;
                 } catch (e) {
                     console.error("Error parsing error response:", e);
-                    const text = await res.text();
-                    console.error("Raw response:", text);
                 }
                 return { success: false, error: errorMsg };
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error("Login network error:", err);
             return { success: false, error: "Network error: " + err.message };
         }
@@ -78,4 +83,10 @@ export const AuthProvider = ({ children }) => {
     );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+    const context = useContext(AuthContext);
+    if (!context) {
+        throw new Error("useAuth must be used within an AuthProvider");
+    }
+    return context;
+};

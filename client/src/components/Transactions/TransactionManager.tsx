@@ -1,20 +1,20 @@
-import React, { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { useBudget } from '../../context/BudgetContext';
-import { format, isSameMonth, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { CheckCircle, Circle, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { CheckCircle, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { RecurringItem } from '../../types';
 
 export default function TransactionManager() {
-    const { recurring, planned, transactions, addTransaction, isPaidThisMonth, categories } = useBudget();
+    const { recurring, transactions, addTransaction, isPaidThisMonth, categories } = useBudget();
     const [amount, setAmount] = useState('');
     const [label, setLabel] = useState('');
-    const [type, setType] = useState('expense');
+    const [type, setType] = useState<'income' | 'expense'>('expense');
     const [status, setStatus] = useState('confirmed');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [categoryId, setCategoryId] = useState('');
 
-    // Simple "Add" handler
-    const handleSubmit = (e) => {
+    const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
         if (!amount || !label || !date) return;
         addTransaction({
@@ -22,8 +22,8 @@ export default function TransactionManager() {
             amount: parseFloat(amount),
             type,
             date: new Date(date).toISOString(),
-            category: categories.find(c => c.id === categoryId)?.label || 'Manual',
-            categoryId: categoryId,
+            category: categories.find(c => c.id.toString() === categoryId)?.label || 'Manual',
+            categoryId: categoryId || undefined,
             status // 'confirmed' or 'planned'
         });
         setAmount('');
@@ -33,25 +33,20 @@ export default function TransactionManager() {
         setDate(new Date().toISOString().split('T')[0]);
     };
 
-    const handleMarkAsPaid = (item) => {
+    const handleMarkAsPaid = (item: RecurringItem) => {
         if (window.confirm(`Confirmer le paiement de ${item.label} (${item.amount}€) ?`)) {
             addTransaction({
                 label: item.label,
                 amount: item.amount,
                 type: item.type,
                 date: new Date().toISOString(),
-                date: new Date().toISOString(),
                 category: item.category,
-                categoryId: item.category_id,
+                categoryId: item.categoryId,
                 recurringId: item.id,
                 status: 'confirmed'
             });
         }
     };
-
-    // Get upcoming for current month which are NOT yet in transactions?
-    // For MVP, just listing the recurring patterns.
-    // In a real app, we'd check if a transaction matching this recurring item exists for this month.
 
     return (
         <div className="grid-layout">
@@ -174,7 +169,7 @@ export default function TransactionManager() {
                         ) : (
                             [...transactions]
                                 .filter(t => t.status !== 'skipped')
-                                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                                 .map((txn) => (
                                     <div key={txn.id} className={`flex items-center justify-between p-3 rounded-lg border ${txn.status === 'planned' ? 'bg-amber-500/5 border-amber-500/20' : 'bg-[#0f172a]/50 border-gray-800'}`}>
                                         <div className="flex items-center gap-3">
@@ -196,7 +191,7 @@ export default function TransactionManager() {
                                             </div>
                                         </div>
                                         <div className={`font-bold ${txn.amount > 0 ? 'text-emerald-400' : 'text-gray-200'} ${txn.status === 'planned' ? 'opacity-70' : ''}`}>
-                                            {txn.amount > 0 ? '+' : ''}{parseFloat(txn.amount).toFixed(2)} €
+                                            {txn.amount > 0 ? '+' : ''}{Number(txn.amount).toFixed(2)} €
                                         </div>
                                     </div>
                                 ))

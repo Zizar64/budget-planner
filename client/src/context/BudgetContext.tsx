@@ -1,21 +1,56 @@
-import React, { createContext, useState, useEffect, useContext, useCallback, useMemo } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback, useMemo, ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { addMonths, startOfMonth, endOfMonth, isSameMonth, parseISO, isBefore, isAfter, addDays, format } from 'date-fns';
+import { Transaction, RecurringItem, PlannedItem, SavingsGoal, Category } from '../types';
 
+interface BudgetContextType {
+    balance: number;
+    transactions: Transaction[];
+    recurring: RecurringItem[];
+    planned: PlannedItem[];
+    savingsGoals: SavingsGoal[];
+    categories: Category[];
+    getProjection: (months?: number) => any[];
+    addTransaction: (txn: Partial<Transaction>) => Promise<void>;
+    updateTransaction: (id: string, fields: Partial<Transaction>) => Promise<void>;
+    deleteTransaction: (id: string) => Promise<void>;
+    addRecurringItem: (item: Partial<RecurringItem>) => Promise<void>;
+    updateRecurringItem: (id: string, item: Partial<RecurringItem>) => Promise<void>;
+    deleteRecurringItem: (id: string) => Promise<void>;
+    addSavingsGoal: (goal: Partial<SavingsGoal>) => Promise<void>;
+    addCategory: (cat: Partial<Category>) => Promise<void>;
+    updateCategory: (id: number | string, cat: Partial<Category>) => Promise<void>;
+    deleteCategory: (id: number | string) => Promise<void>;
+    isPaidThisMonth: (itemId: string) => boolean;
+    initialBalance: number;
+    setInitialBalance: (amount: number) => Promise<void>;
+    getMonthlyReport: (date?: Date) => any[];
+    getEventsForPeriod: (startDate: Date, endDate: Date) => any[];
+}
 
-const BudgetContext = createContext();
+const BudgetContext = createContext<BudgetContextType | undefined>(undefined);
 
-export const useBudget = () => useContext(BudgetContext);
+export const useBudget = () => {
+    const context = useContext(BudgetContext);
+    if (!context) {
+        throw new Error("useBudget must be used within a BudgetProvider");
+    }
+    return context;
+};
 
-export const BudgetProvider = ({ children }) => {
+interface BudgetProviderProps {
+    children: ReactNode;
+}
+
+export const BudgetProvider: React.FC<BudgetProviderProps> = ({ children }) => {
     const API_URL = '/api';
 
-    const [transactions, setTransactions] = useState([]);
-    const [recurring, setRecurring] = useState([]);
-    const [planned, setPlanned] = useState([]); // Legacy planned items if any
-    const [savingsGoals, setSavingsGoals] = useState([]);
-    const [categories, setCategories] = useState([]);
-    const [initialBalance, setInitialBalanceState] = useState(0);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [recurring, setRecurring] = useState<RecurringItem[]>([]);
+    const [planned, setPlanned] = useState<PlannedItem[]>([]);
+    const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [initialBalance, setInitialBalanceState] = useState<number>(0);
 
     // Initial Load
     useEffect(() => {
@@ -37,7 +72,8 @@ export const BudgetProvider = ({ children }) => {
                 const bal = await balRes.json();
                 const cats = await catsRes.json();
 
-                setTransactions(txns ? txns.map(t => ({ ...t, recurringId: t.recurring_id || t.recurringId })) : []);
+                // Normalize data
+                setTransactions(txns ? txns.map((t: any) => ({ ...t, recurringId: t.recurring_id || t.recurringId })) : []);
                 setRecurring(recs || []);
                 setPlanned(plans || []);
                 setSavingsGoals(saves || []);
@@ -54,12 +90,12 @@ export const BudgetProvider = ({ children }) => {
     const balance = useMemo(() => {
         const txnTotal = transactions
             .filter(t => !t.status || t.status === 'confirmed')
-            .reduce((acc, t) => acc + t.amount, 0);
+            .reduce((acc, t) => acc + Number(t.amount), 0);
         return initialBalance + txnTotal;
     }, [transactions, initialBalance]);
 
     // Initial Balance Setter
-    const setInitialBalance = async (amount) => {
+    const setInitialBalance = async (amount: number) => {
         setInitialBalanceState(amount);
         await fetch(`${API_URL}/settings`, {
             method: 'POST',
@@ -70,9 +106,8 @@ export const BudgetProvider = ({ children }) => {
 
     // --- Actions ---
 
-    const addTransaction = async (txn) => {
-        // Optimistic UI update could be done here, but simple fetch for now
-        const amount = txn.type === 'expense' ? -Math.abs(txn.amount) : Math.abs(txn.amount);
+    const addTransaction = async (txn: Partial<Transaction>) => {
+        const amount = txn.type === 'expense' ? -Math.abs(txn.amount || 0) : Math.abs(txn.amount || 0);
         const newTxn = { ...txn, amount };
 
         const res = await fetch(`${API_URL}/transactions`, {
@@ -84,15 +119,16 @@ export const BudgetProvider = ({ children }) => {
         setTransactions(prev => [...prev, { ...savedTxn, recurringId: savedTxn.recurring_id || savedTxn.recurringId }]);
     };
 
-    const updateTransaction = async (id, updatedFields) => {
-        let newAmount = undefined;
+    const updateTransaction = async (id: string, updatedFields: Partial<Transaction>) => {
+        let newAmount: number | undefined = undefined;
         if (updatedFields.amount !== undefined || updatedFields.type !== undefined) {
-            const type = updatedFields.type || transactions.find(t => t.id === id)?.type || 'expense';
-            const amountVal = updatedFields.amount !== undefined ? updatedFields.amount : Math.abs(transactions.find(t => t.id === id)?.amount || 0);
+            const currentTxn = transactions.find(t => t.id === id);
+            const type = updatedFields.type || currentTxn?.type || 'expense';
+            const amountVal = updatedFields.amount !== undefined ? updatedFields.amount : Math.abs(currentTxn?.amount || 0);
             newAmount = type === 'expense' ? -Math.abs(amountVal) : Math.abs(amountVal);
         }
 
-        const payload = { ...updatedFields };
+        const payload: any = { ...updatedFields };
         if (newAmount !== undefined) payload.amount = newAmount;
 
         await fetch(`${API_URL}/transactions/${id}`, {
@@ -104,12 +140,12 @@ export const BudgetProvider = ({ children }) => {
         setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...payload } : t));
     };
 
-    const deleteTransaction = async (id) => {
+    const deleteTransaction = async (id: string) => {
         await fetch(`${API_URL}/transactions/${id}`, { method: 'DELETE' });
         setTransactions(prev => prev.filter(t => t.id !== id));
     };
 
-    const addRecurringItem = async (item) => {
+    const addRecurringItem = async (item: Partial<RecurringItem>) => {
         const res = await fetch(`${API_URL}/recurring`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -119,7 +155,7 @@ export const BudgetProvider = ({ children }) => {
         setRecurring(prev => [...prev, saved]);
     };
 
-    const updateRecurringItem = async (id, updatedItem) => {
+    const updateRecurringItem = async (id: string, updatedItem: Partial<RecurringItem>) => {
         await fetch(`${API_URL}/recurring/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -128,16 +164,17 @@ export const BudgetProvider = ({ children }) => {
         setRecurring(prev => prev.map(item => item.id === id ? { ...item, ...updatedItem } : item));
     };
 
-    const deleteRecurringItem = async (id) => {
+    const deleteRecurringItem = async (id: string) => {
         await fetch(`${API_URL}/recurring/${id}`, { method: 'DELETE' });
         setRecurring(prev => prev.filter(item => item.id !== id));
     };
 
-    const addSavingsGoal = async (goal) => {
-        setSavingsGoals(prev => [...prev, { ...goal, id: uuidv4() }]);
+    const addSavingsGoal = async (goal: Partial<SavingsGoal>) => {
+        setSavingsGoals(prev => [...prev, { ...goal, id: uuidv4() } as SavingsGoal]);
+        // TODO: Persist savings goal
     };
 
-    const addCategory = async (cat) => {
+    const addCategory = async (cat: Partial<Category>) => {
         const res = await fetch(`${API_URL}/categories`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -147,7 +184,7 @@ export const BudgetProvider = ({ children }) => {
         setCategories(prev => [...prev, saved].sort((a, b) => a.label.localeCompare(b.label)));
     };
 
-    const updateCategory = async (id, cat) => {
+    const updateCategory = async (id: number | string, cat: Partial<Category>) => {
         await fetch(`${API_URL}/categories/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -156,14 +193,14 @@ export const BudgetProvider = ({ children }) => {
         setCategories(prev => prev.map(c => c.id === id ? { ...c, ...cat } : c).sort((a, b) => a.label.localeCompare(b.label)));
     };
 
-    const deleteCategory = async (id) => {
+    const deleteCategory = async (id: number | string) => {
         await fetch(`${API_URL}/categories/${id}`, { method: 'DELETE' });
         setCategories(prev => prev.filter(c => c.id !== id));
     };
 
-    // Generic Event Generation (Same logic, mostly pure function using state)
-    const getEventsForPeriod = useCallback((startDate, endDate) => {
-        const events = [];
+    // Generic Event Generation
+    const getEventsForPeriod = useCallback((startDate: Date, endDate: Date) => {
+        const events: any[] = [];
 
         // 1. One-off Planned Items
         planned.forEach(item => {
@@ -187,26 +224,25 @@ export const BudgetProvider = ({ children }) => {
             recurring.forEach(rec => {
                 if (rec.durationMonths && rec.startDate) {
                     const start = parseISO(rec.startDate);
-                    const end = addMonths(start, parseInt(rec.durationMonths));
+                    const end = addMonths(start, Number(rec.durationMonths));
                     const currentMonth = startOfMonth(iterDate);
                     if (isBefore(currentMonth, startOfMonth(start)) || isAfter(currentMonth, endOfMonth(end))) {
                         return;
                     }
                 }
 
-                // Handle end of month overflow (e.g. 31st in Feb)
                 const monthStart = startOfMonth(iterDate);
                 const monthEnd = endOfMonth(monthStart);
-                const safeDay = Math.min(rec.dayOfMonth, parseInt(format(monthEnd, 'd')));
+                const safeDay = Math.min(Number(rec.dayOfMonth), parseInt(format(monthEnd, 'd')));
                 const itemDate = new Date(iterDate.getFullYear(), iterDate.getMonth(), safeDay);
 
-                // Deduplicate: Check if a transaction (confirmed or planned) already exists for this recurring item this month
                 const hasMatch = transactions.some(t =>
                     t.recurringId === rec.id &&
                     t.date &&
                     isSameMonth(parseISO(t.date), itemDate)
                 );
                 if (hasMatch) return;
+
                 if (isAfter(itemDate, startDate) && isBefore(itemDate, endDate)) {
                     events.push({
                         ...rec,
@@ -220,7 +256,7 @@ export const BudgetProvider = ({ children }) => {
             iterDate = addMonths(iterDate, 1);
         }
 
-        return events.sort((a, b) => a.dateObj - b.dateObj);
+        return events.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
     }, [planned, transactions, recurring]);
 
     const getProjection = useCallback((months = 6) => {
@@ -229,7 +265,7 @@ export const BudgetProvider = ({ children }) => {
         const events = getEventsForPeriod(today, endDate);
 
         let runningBalance = balance;
-        const dataPoints = [];
+        const dataPoints: any[] = [];
         dataPoints.push({ date: format(today, 'yyyy-MM-dd'), balance: runningBalance });
 
         events.forEach(e => {
@@ -249,7 +285,6 @@ export const BudgetProvider = ({ children }) => {
         const start = startOfMonth(monthDate);
         const end = endOfMonth(monthDate);
 
-        // 1. Get ALL Real Transactions for the month (Confirmed OR Planned)
         const actuals = transactions.filter(t => {
             if (!t.date) return false;
             const d = parseISO(t.date);
@@ -261,29 +296,21 @@ export const BudgetProvider = ({ children }) => {
             isTransaction: true
         }));
 
-        // 2. Get Projections (Recurring Items ONLY)
-        // We act as if we want events for the whole month context
-        // Use 'end' directly to avoid overlapping into the 1st of next month (which would happen with addDays(end, 1))
         const allProjections = getEventsForPeriod(addDays(start, -1), end);
-
-        // Filter out "Transactions" from projections (prevent duplicates)
-        // We only want 'recurring' items (virtuals) that haven't been forcefully realized or paid
         const virtuals = allProjections.filter(p => p.status === 'recurring');
 
         let merged = [...actuals];
         virtuals.forEach(p => {
-            // Check if this recurring item has a matching Real Transaction in this month
-            // The match is based on recurringId
             const match = actuals.find(a => a.recurringId === p.id);
             if (!match) {
                 merged.push(p);
             }
         });
 
-        return merged.filter(i => i.status !== 'skipped').sort((a, b) => a.dateObj - b.dateObj);
+        return merged.filter(i => i.status !== 'skipped').sort((a: any, b: any) => a.dateObj.getTime() - b.dateObj.getTime());
     }, [transactions, getEventsForPeriod]);
 
-    const isPaidThisMonth = useCallback((itemId) => {
+    const isPaidThisMonth = useCallback((itemId: string) => {
         const currentMonthStart = format(new Date(), 'yyyy-MM');
         return transactions.some(t =>
             t.recurringId === itemId &&
@@ -326,4 +353,3 @@ export const BudgetProvider = ({ children }) => {
         </BudgetContext.Provider>
     );
 };
-

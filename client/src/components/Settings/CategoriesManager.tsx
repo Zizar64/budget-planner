@@ -1,9 +1,9 @@
-
-import React, { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { useBudget } from '../../context/BudgetContext';
-import { Plus, Trash2, Edit2, Home, ShoppingCart, Car, Gamepad2, Banknote, MoreHorizontal, Coffee, Briefcase, Gift, Heart, Music, Zap } from 'lucide-react';
+import { Plus, Trash2, Edit2, Home, ShoppingCart, Car, Gamepad2, Banknote, MoreHorizontal, Coffee, Briefcase, Gift, Heart, Music, Zap, LucideIcon } from 'lucide-react';
+import { Category } from '../../types';
 
-const ICON_MAP = {
+const ICON_MAP: Record<string, LucideIcon> = {
     Home, ShoppingCart, Car, Gamepad2, Banknote, MoreHorizontal, Coffee, Briefcase, Gift, Heart, Music, Zap
 };
 
@@ -14,28 +14,28 @@ const COLORS = [
 export default function CategoriesManager() {
     const { categories, addCategory, updateCategory, deleteCategory } = useBudget();
     const [isAdding, setIsAdding] = useState(false);
-    const [editingId, setEditingId] = useState(null);
+    const [editingId, setEditingId] = useState<number | string | null>(null);
     const [formData, setFormData] = useState({ label: '', type: 'expense', color: '#3B82F6', icon: 'MoreHorizontal' });
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         if (editingId) {
-            await updateCategory(editingId, formData);
+            await updateCategory(editingId, formData as Partial<Category>);
             setEditingId(null);
         } else {
-            await addCategory(formData);
+            await addCategory(formData as Partial<Category>);
         }
         setFormData({ label: '', type: 'expense', color: '#3B82F6', icon: 'MoreHorizontal' });
         setIsAdding(false);
     };
 
-    const handleEdit = (cat) => {
+    const handleEdit = (cat: Category) => {
         setFormData({ label: cat.label, type: cat.type, color: cat.color, icon: cat.icon });
         setEditingId(cat.id);
         setIsAdding(true);
     };
 
-    const handleDelete = async (id) => {
+    const handleDelete = async (id: number | string) => {
         if (confirm('Êtes-vous sûr de vouloir supprimer cette catégorie ?')) {
             await deleteCategory(id);
         }
@@ -47,7 +47,7 @@ export default function CategoriesManager() {
         setFormData({ label: '', type: 'expense', color: '#3B82F6', icon: 'MoreHorizontal' });
     };
 
-    const IconComponent = ({ name, size = 18 }) => {
+    const IconComponent = ({ name, size = 18 }: { name: string, size?: number }) => {
         const Icon = ICON_MAP[name] || MoreHorizontal;
         return <Icon size={size} />;
     };
@@ -106,7 +106,7 @@ export default function CategoriesManager() {
                                     key={c}
                                     type="button"
                                     onClick={() => setFormData({ ...formData, color: c })}
-                                    className={`w-6 h-6 rounded-full border-2 ${formData.color === c ? 'border-white' : 'border-transparent'}`}
+                                    className={`w - 6 h - 6 rounded - full border - 2 ${formData.color === c ? 'border-white' : 'border-transparent'} `}
                                     style={{ backgroundColor: c }}
                                 />
                             ))}
@@ -121,7 +121,7 @@ export default function CategoriesManager() {
                                     key={iconName}
                                     type="button"
                                     onClick={() => setFormData({ ...formData, icon: iconName })}
-                                    className={`p-2 rounded ${formData.icon === iconName ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-gray-400'}`}
+                                    className={`p - 2 rounded ${formData.icon === iconName ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-gray-400'} `}
                                 >
                                     <IconComponent name={iconName} />
                                 </button>

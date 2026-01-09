@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Link, useLocation, Navigate, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Wallet, CreditCard, PiggyBank, Calendar, LogOut, Settings as SettingsIcon } from 'lucide-react';
+import { LayoutDashboard, Wallet, CreditCard, PiggyBank, Calendar, LogOut, Settings as SettingsIcon, LucideIcon } from 'lucide-react';
 import { BudgetProvider } from './context/BudgetContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Dashboard from './components/Dashboard';
@@ -12,7 +12,13 @@ import SavingsPlanner from './components/Savings/SavingsPlanner';
 import MonthlyActivity from './components/Activity/MonthlyActivity';
 import Settings from './components/Settings/Settings';
 
-const NavItem = ({ to, icon: Icon, label }) => {
+interface NavItemProps {
+  to: string;
+  icon: LucideIcon;
+  label: string | React.ReactNode;
+}
+
+const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label }) => {
   const location = useLocation();
   const active = location.pathname === to;
   return (
@@ -59,7 +65,7 @@ const ProtectedLayout = () => {
             Connecté en tant que <span className="text-indigo-400 font-medium">{user.username}</span>
           </div>
           <button
-            onClick={logout}
+            onClick={() => logout()}
             className="flex items-center gap-3 p-3 rounded-xl w-full text-left text-red-400 hover:bg-red-500/10 transition-all"
           >
             <LogOut size={20} />

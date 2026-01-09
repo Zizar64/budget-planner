@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { useBudget } from '../../context/BudgetContext';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { Edit2, Trash2, Plus, X, Check } from 'lucide-react';
+import { Edit2, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { RecurringItem } from '../../types';
 
 export default function BudgetPlanner() {
     const { recurring, addRecurringItem, updateRecurringItem, deleteRecurringItem, categories } = useBudget();
     const [isEditing, setIsEditing] = useState(false);
-    const [editId, setEditId] = useState(null);
+    const [editId, setEditId] = useState<string | null>(null);
 
     // Form State
     const [label, setLabel] = useState('');
     const [amount, setAmount] = useState('');
-    const [type, setType] = useState('expense');
+    const [type, setType] = useState<'income' | 'expense'>('expense');
     const [day, setDay] = useState('1');
     const [categoryId, setCategoryId] = useState('');
     const [isLimited, setIsLimited] = useState(false);
@@ -32,17 +32,17 @@ export default function BudgetPlanner() {
         setEditId(null);
     };
 
-    const handleEdit = (item) => {
+    const handleEdit = (item: RecurringItem) => {
         setIsEditing(true);
         setEditId(item.id);
         setLabel(item.label);
-        setAmount(Math.abs(item.amount));
+        setAmount(Math.abs(item.amount).toString());
         setType(item.type);
-        setDay(item.dayOfMonth);
-        setCategoryId(item.category_id || categories.find(c => c.label === item.category)?.id || '');
+        setDay(item.dayOfMonth?.toString() || '1');
+        setCategoryId(item.categoryId?.toString() || categories.find(c => c.label === item.category)?.id.toString() || '');
         if (item.durationMonths) {
             setIsLimited(true);
-            setDuration(item.durationMonths);
+            setDuration(item.durationMonths.toString());
             setStartDate(item.startDate || format(new Date(), 'yyyy-MM-dd'));
         } else {
             setIsLimited(false);
@@ -50,20 +50,20 @@ export default function BudgetPlanner() {
         }
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
         const payload = {
             label,
             amount: parseFloat(amount),
             type,
             dayOfMonth: parseInt(day),
-            category: categories.find(c => c.id === categoryId)?.label || 'Divers',
-            categoryId,
-            startDate: isLimited ? startDate : null,
-            durationMonths: isLimited ? parseInt(duration) : null
+            category: categories.find(c => c.id.toString() === categoryId)?.label || 'Divers',
+            categoryId: categoryId || undefined,
+            startDate: isLimited ? startDate : undefined,
+            durationMonths: isLimited ? parseInt(duration) : undefined
         };
 
-        if (isEditing) {
+        if (isEditing && editId) {
             updateRecurringItem(editId, payload);
         } else {
             addRecurringItem(payload);
@@ -71,27 +71,11 @@ export default function BudgetPlanner() {
         resetForm();
     };
 
-    const handleDelete = (id) => {
+    const handleDelete = (id: string) => {
         if (window.confirm('Supprimer cette charge ?')) {
             deleteRecurringItem(id);
         }
     };
-
-    // Aggregate for Chart
-    const dataMap = recurring.reduce((acc, item) => {
-        if (item.type === 'expense') {
-            if (!acc[item.category]) acc[item.category] = 0;
-            acc[item.category] += item.amount;
-        }
-        return acc;
-    }, {});
-
-    const data = Object.keys(dataMap).map(key => ({
-        name: key,
-        value: dataMap[key]
-    }));
-
-    const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#ec4899'];
 
     return (
         <div className="grid-layout">
@@ -195,7 +179,7 @@ export default function BudgetPlanner() {
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <span className={`font-mono font-bold ${item.type === 'income' ? 'text-emerald-400' : 'text-gray-200'}`}>
-                                        {parseFloat(item.amount).toFixed(2)} €
+                                        {parseFloat(item.amount.toString()).toFixed(2)} €
                                     </span>
                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button onClick={() => handleEdit(item)} className="p-2 hover:bg-indigo-500/20 rounded text-indigo-400"><Edit2 size={16} /></button>

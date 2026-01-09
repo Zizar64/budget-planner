@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, FormEvent, ChangeEvent } from 'react';
 import { Lock, Save, AlertCircle, Check } from 'lucide-react';
 import CategoriesManager from './CategoriesManager';
 
@@ -10,7 +10,7 @@ export default function Settings() {
     const [success, setSuccess] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setError('');
         setSuccess('');
@@ -38,7 +38,7 @@ export default function Settings() {
             setOldPassword('');
             setNewPassword('');
             setConfirmPassword('');
-        } catch (err) {
+        } catch (err: any) {
             setError(err.message);
         } finally {
             setIsLoading(false);
@@ -115,7 +115,7 @@ export default function Settings() {
                         ) : (
                             <>
                                 <Save size={18} />
-                                Enregistrer
+                                <span className="text-white">Enregistrer</span>
                             </>
                         )}
                     </button>
@@ -150,8 +150,8 @@ export default function Settings() {
                             type="file"
                             accept=".budget"
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                            onChange={async (e) => {
-                                const file = e.target.files[0];
+                            onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+                                const file = e.target.files?.[0];
                                 if (!file) return;
 
                                 if (!confirm("ATTENTION : Cette action écrasera toutes les données actuelles par celles de la sauvegarde. Voulez-vous continuer ?")) {
@@ -160,8 +160,8 @@ export default function Settings() {
                                 }
 
                                 const reader = new FileReader();
-                                reader.onload = async (event) => {
-                                    const base64Data = event.target.result;
+                                reader.onload = async (event: ProgressEvent<FileReader>) => {
+                                    const base64Data = event.target?.result as string;
                                     try {
                                         const res = await fetch('/api/restore', {
                                             method: 'POST',
@@ -175,7 +175,7 @@ export default function Settings() {
                                         } else {
                                             alert("Erreur de restauration: " + result.error);
                                         }
-                                    } catch (err) {
+                                    } catch (err: any) {
                                         alert("Erreur réseau: " + err.message);
                                     }
                                 };

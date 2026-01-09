@@ -1,16 +1,24 @@
-import React, { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { useBudget } from '../../context/BudgetContext';
-import { format, addMonths, subMonths, isSameMonth } from 'date-fns';
+import { format, addMonths, subMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Calculator, CheckCircle, Clock, Edit2, Trash2 } from 'lucide-react';
+
 
 export default function MonthlyActivity() {
     const { getMonthlyReport, updateTransaction, addTransaction, deleteTransaction, categories } = useBudget();
     const [currentMonth, setCurrentMonth] = useState(new Date());
 
     // Edit State
-    const [editingItem, setEditingItem] = useState(null);
-    const [editForm, setEditForm] = useState({ label: '', amount: '', type: 'expense', date: '', status: 'confirmed' });
+    const [editingItem, setEditingItem] = useState<any | null>(null);
+    const [editForm, setEditForm] = useState({
+        label: '',
+        amount: '',
+        type: 'expense' as 'income' | 'expense',
+        date: '',
+        status: 'confirmed',
+        categoryId: ''
+    });
 
     const report = getMonthlyReport(currentMonth);
 
@@ -24,15 +32,15 @@ export default function MonthlyActivity() {
 
     const balance = totalIncome + totalExpense;
 
-    const handleEditClick = (item) => {
+    const handleEditClick = (item: any) => {
         setEditingItem(item);
         setEditForm({
             label: item.label,
-            amount: Math.abs(item.amount),
+            amount: Math.abs(item.amount).toString(),
             type: item.amount < 0 ? 'expense' : 'income',
             date: format(item.dateObj, 'yyyy-MM-dd'),
             status: item.status || 'recurring', // 'recurring' effectively means 'planned' in UI context here
-            categoryId: item.category_id || categories.find(c => c.label === item.category)?.id || ''
+            categoryId: item.category_id?.toString() || categories.find(c => c.label === item.category)?.id.toString() || ''
         });
     };
 
@@ -64,7 +72,7 @@ export default function MonthlyActivity() {
         }
     };
 
-    const saveEdit = (e) => {
+    const saveEdit = (e: FormEvent) => {
         e.preventDefault();
 
         const amount = parseFloat(editForm.amount);
@@ -79,8 +87,8 @@ export default function MonthlyActivity() {
                 type: type,
                 date: editForm.date,
                 status: status,
-                category_id: editForm.categoryId,
-                category: categories.find(c => c.id === editForm.categoryId)?.label || editingItem.category
+                categoryId: editForm.categoryId || null,
+                category: categories.find(c => c.id.toString() === editForm.categoryId)?.label || editingItem.category
             });
         } else {
             // It is a Projection -> CREATE (Realize)
@@ -89,9 +97,8 @@ export default function MonthlyActivity() {
                 amount: amount,
                 type: type,
                 date: editForm.date,
-                date: editForm.date,
-                category_id: editForm.categoryId,
-                category: categories.find(c => c.id === editForm.categoryId)?.label || editingItem.category,
+                categoryId: editForm.categoryId || undefined,
+                category: categories.find(c => c.id.toString() === editForm.categoryId)?.label || editingItem.category,
                 recurringId: editingItem.id, // Link to rule/plan ID
                 status: status
             });

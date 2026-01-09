@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { useBudget } from '../../context/BudgetContext';
 import { Target, Plus } from 'lucide-react';
 
@@ -8,13 +8,13 @@ export default function SavingsPlanner() {
     const [target, setTarget] = useState('');
     const [current, setCurrent] = useState('');
 
-    const handleSubmit = (e) => {
+    const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
         if (!label || !target) return;
         addSavingsGoal({
             label,
-            target: parseFloat(target),
-            current: parseFloat(current || 0)
+            target_amount: parseFloat(target),
+            current_amount: parseFloat(current || '0')
         });
         setLabel('');
         setTarget('');
@@ -69,7 +69,7 @@ export default function SavingsPlanner() {
                 {/* Goals List */}
                 <div className="lg:col-span-2 space-y-4">
                     {savingsGoals.map(goal => {
-                        const progress = Math.min(100, (goal.current / goal.target) * 100);
+                        const progress = Math.min(100, (goal.current_amount / goal.target_amount) * 100);
                         return (
                             <div key={goal.id} className="glass-panel p-6">
                                 <div className="flex justify-between items-center mb-4">
@@ -79,7 +79,7 @@ export default function SavingsPlanner() {
                                         </div>
                                         <div>
                                             <h3 className="font-bold text-lg">{goal.label}</h3>
-                                            <p className="text-sm text-gray-400">{goal.current} € / {goal.target} €</p>
+                                            <p className="text-sm text-gray-400">{goal.current_amount} € / {goal.target_amount} €</p>
                                         </div>
                                     </div>
                                     <div className="text-right">
