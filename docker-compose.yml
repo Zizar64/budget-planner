@@ -4,49 +4,41 @@ services:
   client:
     build:
       context: ./client
-      target: builder # Stop at Node stage (don't build Nginx image)
-    command: npm run dev
     ports:
-      - "8080:5173" # Map host 8080 to Vite 5173
-    volumes:
-      - ./client:/app
-      - /app/node_modules # Preserve container node_modules
+      - "${CLIENT_PORT:-8080}:80"
     depends_on:
       - server
     networks:
       - budget-net
-    environment:
-      - VITE_API_URL=http://server:3000 # Override for Docker
+    restart: always
 
   server:
     build:
       context: ./server
-    command: npm run dev # node --watch index.js
     ports:
-      - "3000:3000"
-    volumes:
-      - ./server:/app
-      - /app/node_modules
+      - "${SERVER_PORT:-3000}:3000"
     depends_on:
       - db
     environment:
       - POSTGRES_HOST=db
-      - POSTGRES_USER=myuser
-      - POSTGRES_PASSWORD=mypassword
-      - POSTGRES_DB=budget_db
-      - JWT_SECRET=dev-secret-key
+      - POSTGRES_USER=${POSTGRES_USER:-myuser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mypassword}
+      - POSTGRES_DB=${POSTGRES_DB:-budget_db}
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key}
+      - PORT=3000
     networks:
       - budget-net
+    restart: always
 
   db:
     image: postgres:15-alpine
     restart: always
     environment:
-      - POSTGRES_USER=myuser
-      - POSTGRES_PASSWORD=mypassword
-      - POSTGRES_DB=budget_db
+      - POSTGRES_USER=${POSTGRES_USER:-myuser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mypassword}
+      - POSTGRES_DB=${POSTGRES_DB:-budget_db}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     networks:
@@ -54,7 +46,6 @@ services:
 
 networks:
   budget-net:
-
 
 volumes:
   db_data:
