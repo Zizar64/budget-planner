@@ -18,7 +18,8 @@ services:
     ports:
       - "${SERVER_PORT:-3000}:3000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       - POSTGRES_HOST=db
       - POSTGRES_USER=${POSTGRES_USER:-myuser}
@@ -33,6 +34,11 @@ services:
   db:
     image: postgres:15-alpine
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-myuser} -d ${POSTGRES_DB:-budget_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-myuser}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mypassword}
